@@ -87,4 +87,3 @@ if __name__ == "__main__":
     dset = ASLAlphabet()
 
     print(dset.dirnames)
-    print(dset.dirnames)
