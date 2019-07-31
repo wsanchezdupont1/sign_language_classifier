@@ -72,7 +72,7 @@ class ASLAlphabet(Dataset):
         filename = os.path.join(self.basedir, self.dirnames[letter])
 
         x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
-        x = Normalize(x.mean(dim=))
+        x = Normalize(x.mean(dim=(-2,-1)))
         """
         Left off here
         """
