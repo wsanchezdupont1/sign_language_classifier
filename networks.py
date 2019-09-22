@@ -86,13 +86,13 @@ class SLClassifier(nn.Module):
         # reshape
         x = x.view(-1,1600)
         x = self.fc1(x)
-        x = F.tanh(x)
+        x = torch.tanh(x)
         x = self.norm5(x)
         x = self.fc2(x)
-        x = F.tanh(x)
+        x = torch.tanh(x)
         x = self.norm6(x)
         x = self.fc3(x)
-        x = F.tanh(x)
+        x = torch.tanh(x)
         x = self.norm7(x)
         result = self.fc4(x) # raw network scores
 
@@ -111,6 +111,12 @@ if __name__ == '__main__':
     samples = torch.cat([dset[0].unsqueeze(0),dset[1].unsqueeze(0)],dim=0)
     print('samples.shape =',samples.shape)
 
+    scores = net(samples)
+    print('scores.shape =',scores.shape)
+
+    # make sure batch norm works during eval
+    net.eval()
+    samples = dset[0].unsqueeze(0)
     scores = net(samples)
     print('scores.shape =',scores.shape)
 
