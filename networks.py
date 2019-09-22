@@ -44,9 +44,9 @@ class SLClassifier(nn.Module):
         self.fc1 = nn.Linear(1600,800)
         self.norm5 = nn.BatchNorm1d(num_features=800)
         self.fc2 = nn.Linear(800,400)
-        self.norm6 = nn.BatchNorm1d(num_features=800)
+        self.norm6 = nn.BatchNorm1d(num_features=400)
         self.fc3 = nn.Linear(400,100)
-        self.norm7 = nn.BatchNorm1d(num_features=800)
+        self.norm7 = nn.BatchNorm1d(num_features=100)
         self.fc4 = nn.Linear(100,29)
 
     def forward(self,x):
@@ -104,11 +104,14 @@ Run module as script.
 if __name__ == '__main__':
     from datasets import ASLAlphabet
 
+
     dset = ASLAlphabet() # get dataset
     net = SLClassifier() # initialize network
 
-    sample = dset[0].unsqueeze(0)
-    print('sample.shape =',sample.shape)
+    samples = torch.cat([dset[0].unsqueeze(0),dset[1].unsqueeze(0)],dim=0)
+    print('samples.shape =',samples.shape)
 
-    scores = net(sample)
+    scores = net(samples)
     print('scores.shape =',scores.shape)
+
+    print("[ networks.py TESTING COMPLETE ]")

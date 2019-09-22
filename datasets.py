@@ -71,13 +71,7 @@ class ASLAlphabet(Dataset):
         index = idx%3000 # index within letter directory
         filename = os.path.join(self.basedir, self.dirnames[letter])
 
-        print('os.listdir(filename):')
-        print(os.listdir(filename))
-        print('os.listdir(filename)[index]:')
-        print(os.listdir(filename)[index])
-
         x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
-
         return x # don't normalize here, use norm as first network layer
 
 
@@ -100,3 +94,5 @@ if __name__ == "__main__":
     print('sample.shape =',sample.shape)
     plt.imshow(np.array(sample.permute(1,2,0))) # move channels to 3rd dim and imshow
     plt.show()
+
+    print('[ datasets.py TESTING COMPLETE ]')
