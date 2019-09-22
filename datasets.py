@@ -45,7 +45,7 @@ class ASLAlphabet(Dataset):
             self.basedir = os.path.join(self.basedir,'test')
 
         self.dirnames = os.listdir(self.basedir) # get names of each class directory
-        dset.dirnames.sort()
+        self.dirnames.sort()
 
     def __len__(self):
         """
@@ -71,19 +71,32 @@ class ASLAlphabet(Dataset):
         index = idx%3000 # index within letter directory
         filename = os.path.join(self.basedir, self.dirnames[letter])
 
-        x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
-        x = Normalize(x.mean(dim=(-2,-1)))
-        """
-        Left off here
-        """
+        print('os.listdir(filename):')
+        print(os.listdir(filename))
+        print('os.listdir(filename)[index]:')
+        print(os.listdir(filename)[index])
 
-        return x
+        x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
+
+        return x # don't normalize here, use norm as first network layer
 
 
 """
 Module testing
 """
 if __name__ == "__main__":
+    #
+    # constructor test
+    #
     dset = ASLAlphabet()
+    print('dset.dirnames =',dset.dirnames)
 
-    print(dset.dirnames)
+    #
+    # imshow test
+    #
+    import numpy as np
+    from matplotlib import pyplot as plt
+    sample = dset[3000*29-1]
+    print('sample.shape =',sample.shape)
+    plt.imshow(np.array(sample.permute(1,2,0))) # move channels to 3rd dim and imshow
+    plt.show()
