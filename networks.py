@@ -28,6 +28,8 @@ class SLClassifier(nn.Module):
         #
         # Image feature encoder
         #
+        # bnorm goes first here since dataset samples are unnormalized (also enables normalization using gpu)
+        #
         self.norm1 = nn.BatchNorm2d(num_features=3) # 3-channel inputs
         self.conv1 = nn.Conv2d(3,64,4) # output shape (197,197)
         self.conv2 = nn.Conv2d(64,64,4) # output shape (194,194)
@@ -118,6 +120,6 @@ if __name__ == '__main__':
     net.eval()
     samples = dset[0].unsqueeze(0)
     scores = net(samples)
-    print('scores.shape =',scores.shape)
+    print('scores.shape =',scores.shape,'(.eval() check)')
 
     print("[ networks.py TESTING COMPLETE ]")
