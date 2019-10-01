@@ -72,7 +72,7 @@ class ASLAlphabet(Dataset):
         filename = os.path.join(self.basedir, self.dirnames[letter])
 
         x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
-        return x # don't normalize here, use norm as first network layer
+        return letter,x # don't normalize here, use norm as first network layer
 
 
 """
@@ -90,7 +90,8 @@ if __name__ == "__main__":
     #
     import numpy as np
     from matplotlib import pyplot as plt
-    sample = dset[3000*29-1]
+    letter,sample = dset[3000*29-1]
+    print('letter =',letter)
     print('sample.shape =',sample.shape)
     plt.imshow(np.array(sample.permute(1,2,0))) # move channels to 3rd dim and imshow
     plt.show()
