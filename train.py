@@ -22,16 +22,35 @@ def train(net,optimizer,lossfunc,dataloader,batchsize=32,numepochs=100,device='c
         device - (str) device to perform computations on
 
     """
+
+    import timeit
+    t = timeit.Timer()
+
     net.to(device) # move params to device
 
     for epoch in range(numepochs):
         for i,batch in enumerate(dataloader):
-            labels,samples = batch
-            print('labels.shape =',labels.shape)
-            print('samples.shape =',samples.shape)
-            scores = net(samples.to(device))
-            print('scores.shape =',scores.shape)
 
+            # sample and move to device
+            labels,samples = batch
+            samples = samples.to(device)
+            labels = labels.to(device)
+
+            scores = net(samples)
+
+            loss = lossfunc(scores,labels)
+            if i  % 100 == 0:
+                print('i: ',i)
+                print('loss: ',loss)
+
+            # backprop + paramater update
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        # remove when actually training
+        if epoch==1:
+            return
     return
 
 """
@@ -75,6 +94,6 @@ if __name__ == "__main__":
     dataloader = DataLoader(datasets.ASLAlphabet(train=True),batch_size=opts.batchsize,shuffle=True)
 
     # initialize loss function
-    lossfunc = torch.nn.CrossEntropyLoss()
+    lossfunc = torch.nn.CrossEntropyLoss(reduction='mean')
 
     train(net,optimizer,lossfunc,dataloader,batchsize=opts.batchsize,numepochs=opts.numepochs,device=opts.device)

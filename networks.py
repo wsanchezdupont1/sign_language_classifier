@@ -101,25 +101,29 @@ class SLClassifier(nn.Module):
         return result
 
 """
-Run module as script.
+Run module as script (for testing, mostly).
 """
 if __name__ == '__main__':
     from datasets import ASLAlphabet
-
+    from matplotlib import pyplot as plt
 
     dset = ASLAlphabet() # get dataset
     net = SLClassifier() # initialize network
 
-    samples = torch.cat([dset[0].unsqueeze(0),dset[1].unsqueeze(0)],dim=0)
+    samples = torch.cat([dset[3000*29-1][1].unsqueeze(0), dset[0][1].unsqueeze(0)],dim=0)
     print('samples.shape =',samples.shape)
+
+    # plot
+    plt.imshow(samples[0].permute(1,2,0))
+    plt.show()
 
     scores = net(samples)
     print('scores.shape =',scores.shape)
 
     # make sure batch norm works during eval
     net.eval()
-    samples = dset[0].unsqueeze(0)
-    scores = net(samples)
-    print('scores.shape =',scores.shape,'(.eval() check)')
+    letter,sample = dset[0]
+    score = net(sample.unsqueeze(0))
+    print('score.shape =',score.shape,'(.eval() check)')
 
     print("[ networks.py TESTING COMPLETE ]")
