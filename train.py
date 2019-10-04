@@ -7,7 +7,15 @@ train.py
 Training script for sign language classifier.
 
 """
-def train(net,optimizer,lossfunc,dataloader,batchsize=32,numepochs=100,device='cuda'):
+def train(net,
+          optimizer,
+          lossfunc,
+          dataloader,
+          batchsize=32,
+          numepochs=100,
+          device='cuda',
+          logdir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs'
+          ):
     """
     train
 
@@ -20,17 +28,18 @@ def train(net,optimizer,lossfunc,dataloader,batchsize=32,numepochs=100,device='c
         batchsize - (int) number of samples per batches
         numepochs - (int) number of epochs to train on
         device - (str) device to perform computations on
+        logdir - (str) Directory for tensorboard data logs
 
     """
-
-    import timeit
-    t = timeit.Timer()
+    from torch.utils.tensorboard import SummaryWriter
+    import time
 
     net.to(device) # move params to device
 
+    s = SummaryWriter(log_dir=logdir)
     for epoch in range(numepochs):
         for i,batch in enumerate(dataloader):
-
+            t_start = time.time()
             # sample and move to device
             labels,samples = batch
             samples = samples.to(device)
@@ -39,18 +48,32 @@ def train(net,optimizer,lossfunc,dataloader,batchsize=32,numepochs=100,device='c
             scores = net(samples)
 
             loss = lossfunc(scores,labels)
-            if i  % 100 == 0:
-                print('i: ',i)
-                print('loss: ',loss)
 
             # backprop + paramater update
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+            t_end = time.time()
+
+            #
+            # Tensorboard logging
+            #
+            if i  % 100 == 0:
+                print('i: ',i)
+                print('loss: ',loss)
+                s.add_scalar('times',t_end-t_start,i)
+                s.add_scalar('loss',loss,i)
+
+            #
+            # LEFT OFF HERE
+            # 10/3/2019 - 7:25pm
+            #
+
         # remove when actually training
         if epoch==1:
             return
+
     return
 
 """
