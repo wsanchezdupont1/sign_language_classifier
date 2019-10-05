@@ -35,11 +35,15 @@ def train(net,
     import time
 
     net.to(device) # move params to device
+    print('[ network pushed to device ]')
 
     s = SummaryWriter(log_dir=logdir)
+
+    print('[ starting training ]')
+    print('----------------------------------------------------------------')
+    t_start = time.time()
     for epoch in range(numepochs):
         for i,batch in enumerate(dataloader):
-            t_start = time.time()
             # sample and move to device
             labels,samples = batch
             samples = samples.to(device)
@@ -54,16 +58,18 @@ def train(net,
             loss.backward()
             optimizer.step()
 
-            t_end = time.time()
 
             #
             # Tensorboard logging
             #
             if i  % 100 == 0:
+                t_end = time.time()
                 print('i: ',i)
                 print('loss: ',loss)
                 s.add_scalar('times',t_end-t_start,i)
-                s.add_scalar('loss',loss,i)
+                s.add_scalar('batch_loss_mean',loss,i)
+                print('----------------------------------------------------------------')
+                t_start = t_end
 
             #
             # LEFT OFF HERE
