@@ -14,7 +14,8 @@ def train(net,
           batchsize=32,
           numepochs=100,
           device='cuda',
-          logdir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs'
+          logdir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs',
+          log_frequency=100
           ):
     """
     train
@@ -29,6 +30,7 @@ def train(net,
         numepochs - (int) number of epochs to train on
         device - (str) device to perform computations on
         logdir - (str) Directory for tensorboard data logs
+        log_frequency - (int) logging frequency (in number of batches)
 
     """
     from torch.utils.tensorboard import SummaryWriter
@@ -37,48 +39,86 @@ def train(net,
     net.to(device) # move params to device
     print('[ network pushed to device ]')
 
-    s = SummaryWriter(log_dir=logdir)
+    s = SummaryWriter(log_dir=logdir) # start tensorboard writer
+
+    # load graph of net with dummy input image
+    s.add_graph(net,torch.rand(1,3,200,200).to(device))
 
     print('[ starting training ]')
     print('----------------------------------------------------------------')
-    t_start = time.time()
+    t_start = time.time() # record
+
+    batches_processed = 0
+    logstep = 0 # the "global_step" variable for tensorboard logging
     for epoch in range(numepochs):
         for i,batch in enumerate(dataloader):
+
+            # TODO: add validation
+
             # sample and move to device
             labels,samples = batch
             samples = samples.to(device)
             labels = labels.to(device)
 
             scores = net(samples)
+            probs = scores.softmax(dim=1)
 
-            loss = lossfunc(scores,labels)
+            loss = lossfunc(scores,labels) # with batch dim (note: default reduction is 'none' - see below)
+
+            # TODO: add regularization (e.g. L1/L2)
+
+            # store mean and std
+            loss_var = torch.var(loss)
+            loss_mean = torch.mean(loss)
 
             # backprop + paramater update
             optimizer.zero_grad()
-            loss.backward()
+            loss_mean.backward()
             optimizer.step()
 
+            batches_processed += 1
 
             #
             # Tensorboard logging
             #
-            if i  % 100 == 0:
+            if batches_processed % log_frequency == 0:
+                print('logstep =',logstep)
+
+                # log time for 100 batches
                 t_end = time.time()
-                print('i: ',i)
-                print('loss: ',loss)
-                s.add_scalar('times',t_end-t_start,i)
-                s.add_scalar('batch_loss_mean',loss,i)
-                print('----------------------------------------------------------------')
+                s.add_scalar('times_100batch',t_end-t_start,logstep)
                 t_start = t_end
+
+                # compute accuracy
+                _,class_pred = probs.max(dim=1)
+                acc = (class_pred==labels).sum() / float(len(labels))  # accuracy
+
+                # record batch loss mean + std
+                s.add_scalars('run1/losses',{'loss/mean':loss_mean,'loss/var':loss_var},logstep)
+                s.add_scalar('accuracy',acc,logstep)
+
+                # histograms
+                # TODO: add histogram of weights
+                s.add_histogram('run1/losses/batch',loss,logstep) # batch losses
+                # TODO: add  weight initialization!!!!
+
+                # TODO: precision-recall curve
+                # s.add_pr_curve('run1',labels=labels,predictions=probs,global_step=logstep)
+
+                # TODO: sample images
+
+                # TODO: grad-CAM
+
+
+                logstep += 1
+                print('----------------------------------------------------------------')
 
             #
             # LEFT OFF HERE
             # 10/3/2019 - 7:25pm
             #
 
-        # remove when actually training
-        if epoch==1:
-            return
+        return net # return the network for later usage
 
     return
 
@@ -104,6 +144,8 @@ if __name__ == "__main__":
     parser.add_argument('-n','--numepochs',type=int,default=1,help='(int) Number of epochs to train on | default: 1 (for testing only)')
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
+    parser.add_argument('--logdir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs",help="(str) Directory to log run data in")
+    parser.add_argument('--log_freq',type=int,default=100,help="(int) logging frequency (number of batches")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
 
     # optimizer args
@@ -120,9 +162,24 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(net.parameters(),lr=opts.lr) # SGD for now, add options later
 
     # initialize dataloader
-    dataloader = DataLoader(datasets.ASLAlphabet(train=True),batch_size=opts.batchsize,shuffle=True)
+    dataset = datasets.ASLAlphabet(train=True)
+    dataloader = DataLoader(dataset,batch_size=opts.batchsize,shuffle=True)
 
     # initialize loss function
-    lossfunc = torch.nn.CrossEntropyLoss(reduction='mean')
+    lossfunc = torch.nn.CrossEntropyLoss(reduction='none')
 
-    train(net,optimizer,lossfunc,dataloader,batchsize=opts.batchsize,numepochs=opts.numepochs,device=opts.device)
+    train(net,
+          optimizer,
+          lossfunc,
+          dataloader,
+          batchsize=opts.batchsize,
+          numepochs=opts.numepochs,
+          device=opts.device,
+          logdir=opts.logdir,
+          log_frequency=opts.log_freq)
+
+    print('[ testing eval mode ... ]')
+    net.eval()
+    sample = dataset[0].unsqueeze(0)
+    probs = torch.nn.functional.softmax(net(sample),dim=1)
+    print('probs =',probs)

@@ -6,6 +6,10 @@ networks.py
 
 Models and networks for sign language classifier.
 
+Notes:
+
+TODO: weight initialization
+
 """
 import torch
 import torch.nn as nn
