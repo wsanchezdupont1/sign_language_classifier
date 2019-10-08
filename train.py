@@ -103,11 +103,23 @@ def train(net,
                 # TODO: add  weight initialization!!!!
 
                 # TODO: precision-recall curve
-                # s.add_pr_curve('run1',labels=labels,predictions=probs,global_step=logstep)
+                print('labels.shape =',labels.shape)
+                print('probs.shape =',probs.shape)
+                one_hot = torch.nn.functional.one_hot(labels)
+                print('one_hot.shape =',one_hot.shape)
+
+                # sometimes 29th class isn't represented, so one_hot results in <29 columns
+                if one_hot.size(1) < 29:
+                    one_hot = torch.cat([one_hot.cpu(), torch.zeros(one_hot.size(0), 29-one_hot.size(1)).long()],dim=1)
+
+                # TODO: makethis work for multi-class
+                s.add_pr_curve('run1',labels=one_hot,predictions=probs,global_step=logstep)
 
                 # TODO: sample images
 
                 # TODO: grad-CAM
+
+                # TODO: activation distributions for layers
 
 
                 logstep += 1
@@ -181,5 +193,5 @@ if __name__ == "__main__":
     print('[ testing eval mode ... ]')
     net.eval()
     sample = dataset[0].unsqueeze(0)
-    probs = torch.nn.functional.softmax(net(sample),dim=1)
+    probs = net(sample).softmax(dim=1)
     print('probs =',probs)
