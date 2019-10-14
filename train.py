@@ -7,14 +7,22 @@ train.py
 Training script for sign language classifier.
 
 """
+import os
+from argparse import ArgumentParser
+import datasets
+import networks
+import torch
+from torch.utils.data import DataLoader
+
 def train(net,
           optimizer,
           lossfunc,
           dataloader,
           batchsize=32,
-          numepochs=100,
+          numepochs=1,
           device='cuda',
-          logdir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs',
+          log_basedir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs',
+          logdir='run1',
           log_frequency=100
           ):
     """
@@ -29,7 +37,8 @@ def train(net,
         batchsize - (int) number of samples per batches
         numepochs - (int) number of epochs to train on
         device - (str) device to perform computations on
-        logdir - (str) Directory for tensorboard data logs
+        log_basedir - (str) project logging folder that holds all logs (e.g. "C:\\Users...\\project_name\logs")
+        logdir - (str) subdirectory of log_basedir specifying the storage folder for _this_ experiment (e.g. "run1")
         log_frequency - (int) logging frequency (in number of batches)
 
     """
@@ -39,7 +48,14 @@ def train(net,
     net.to(device) # move params to device
     print('[ network pushed to device ]')
 
-    s = SummaryWriter(log_dir=logdir) # start tensorboard writer
+    logpath = os.path.join(log_basedir,logdir)
+    s = SummaryWriter(log_dir=logpath) # start tensorboard writer
+
+    # create state_dict log folder if it doesn't exist
+    state_dict_path = os.path.join(logpath,'state_dicts')
+    if not os.path.exists(state_dict_path):
+        os.mkdir(state_dict_path)
+
 
     # load graph of net with dummy input image
     s.add_graph(net,torch.rand(1,3,200,200).to(device))
@@ -83,6 +99,7 @@ def train(net,
             #
             if batches_processed % log_frequency == 0:
                 print('logstep =',logstep)
+                print('batches_processed =',batches_processed)
 
                 # log time for 100 batches
                 t_end = time.time()
@@ -112,7 +129,7 @@ def train(net,
                 if one_hot.size(1) < 29:
                     one_hot = torch.cat([one_hot.cpu(), torch.zeros(one_hot.size(0), 29-one_hot.size(1)).long()],dim=1)
 
-                # TODO: makethis work for multi-class
+                # TODO: fix this!!
                 s.add_pr_curve('run1',labels=one_hot,predictions=probs,global_step=logstep)
 
                 # TODO: sample images
@@ -125,14 +142,13 @@ def train(net,
                 logstep += 1
                 print('----------------------------------------------------------------')
 
-            #
-            # LEFT OFF HERE
-            # 10/3/2019 - 7:25pm
-            #
+        # checkpoint model every epoch
+        pth_path = os.path.join(state_dict_path, 'net_state_dict_%s%i.pth' % ('epoch',epoch))
+        torch.save(net.state_dict(),pth_path)
+        print('[ model saved, path = %s ]' % pth_path)
 
-        return net # return the network for later usage
 
-    return
+    return net # return the network for subsequent usage
 
 """
 
@@ -144,11 +160,6 @@ Run module as script.
 
 """
 if __name__ == "__main__":
-    from argparse import ArgumentParser
-    import datasets
-    import networks
-    import torch
-    from torch.utils.data import DataLoader
 
     parser = ArgumentParser()
 
@@ -156,8 +167,9 @@ if __name__ == "__main__":
     parser.add_argument('-n','--numepochs',type=int,default=1,help='(int) Number of epochs to train on | default: 1 (for testing only)')
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
-    parser.add_argument('--logdir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\runs",help="(str) Directory to log run data in")
-    parser.add_argument('--log_freq',type=int,default=100,help="(int) logging frequency (number of batches")
+    parser.add_argument('--log_basedir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs",help="(str) project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
+    parser.add_argument('--logdir',type=str,default="run1",help="(str) subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
+    parser.add_argument('-lf','--log_freq',type=int,default=100,help="(int) logging frequency (number of batches")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
 
     # optimizer args
@@ -187,6 +199,7 @@ if __name__ == "__main__":
           batchsize=opts.batchsize,
           numepochs=opts.numepochs,
           device=opts.device,
+          log_basedir=opts.log_basedir,
           logdir=opts.logdir,
           log_frequency=opts.log_freq)
 
