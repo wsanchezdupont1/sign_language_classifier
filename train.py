@@ -133,11 +133,11 @@ def train(net,
                 s.add_pr_curve('run1',labels=one_hot,predictions=probs,global_step=logstep)
 
                 # TODO: sample images
+                # s.add_image('batch_samples',torch.make_grid())
 
                 # TODO: grad-CAM
 
                 # TODO: activation distributions for layers
-
 
                 logstep += 1
                 print('----------------------------------------------------------------')

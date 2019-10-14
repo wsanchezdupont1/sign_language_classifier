@@ -114,7 +114,7 @@ if __name__ == '__main__':
     dset = ASLAlphabet() # get dataset
     net = SLClassifier() # initialize network
 
-    samples = torch.cat([dset[3000*29-1][1].unsqueeze(0), dset[0][1].unsqueeze(0)],dim=0)
+    samples = torch.cat([dset[dset.samplesPerClass*29-1][1].unsqueeze(0), dset[0][1].unsqueeze(0)],dim=0)
     print('samples.shape =',samples.shape)
 
     # plot
