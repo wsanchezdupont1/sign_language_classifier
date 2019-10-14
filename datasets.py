@@ -8,8 +8,6 @@ Dataset file for sign language classifer. Uses Pytorch.
 
 Notes:
 
-
-
 """
 
 import torch
@@ -18,15 +16,15 @@ from torch.utils.data import Dataset
 import os
 from PIL import Image
 import math
-from torchvision.transforms import ToTensor,Normalize
+from torchvision.transforms import ToTensor
 
 class ASLAlphabet(Dataset):
     """
     ASLAlphabet
 
-    A dataset class for a Kaggle ASL alphabet dataset. Link: https://www.kaggle.com/grassknoted/asl-alphabet
+    A dataset class for a Kaggle ASL alphabet dataset. Link: https://www.kaggle.com/grassknoted/asl-alphabet.
     """
-    def __init__(self,basedir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\asl_alphabet',train=True):
+    def __init__(self,basedir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\asl_alphabet\\train'):
         """
         __init__
 
@@ -34,18 +32,13 @@ class ASLAlphabet(Dataset):
 
         inputs:
             basedir - (str) base directory of dataset
-            train - (bool) training set if true, test set if false.
         """
         super(ASLAlphabet,self).__init__()
 
         self.basedir = basedir
-        if train:
-            self.basedir = os.path.join(self.basedir,'train')
-        else:
-            self.basedir = os.path.join(self.basedir,'test')
-
         self.dirnames = os.listdir(self.basedir) # get names of each class directory
         self.dirnames.sort()
+        self.samplesPerClass = len(os.listdir(os.path.join(self.basedir, self.dirnames[0])))
 
     def __len__(self):
         """
@@ -53,7 +46,7 @@ class ASLAlphabet(Dataset):
 
         Returns number of samples in dataset.
         """
-        return 3000*29 # 29 classes * 3000 images per class
+        return self.samplesPerClass*29
 
     def  __getitem__(self,idx):
         """
@@ -66,9 +59,10 @@ class ASLAlphabet(Dataset):
 
         outputs:
             x - (torch.Tensor) sample idx from dataset
+            letter - (str) letter/class that x is from
         """
-        letter = math.floor(idx/3000) # index of folder within train directory
-        index = idx%3000 # index within letter directory
+        letter = math.floor(idx/self.samplesPerClass) # index of folder within train directory
+        index = idx%self.samplesPerClass # index within letter directory
         filename = os.path.join(self.basedir, self.dirnames[letter])
 
         x = ToTensor()(Image.open(os.path.join(filename, os.listdir(filename)[index]))) # open and make tensor
@@ -90,7 +84,7 @@ if __name__ == "__main__":
     #
     import numpy as np
     from matplotlib import pyplot as plt
-    letter,sample = dset[3000*29-1]
+    letter,sample = dset[dset.samplesPerClass*29-1]
     print('letter =',letter)
     print('sample.shape =',sample.shape)
     plt.imshow(np.array(sample.permute(1,2,0))) # move channels to 3rd dim and imshow
