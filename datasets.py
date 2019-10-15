@@ -133,6 +133,7 @@ class TestASLAlphabet(Dataset):
         x = ToTensor()(Image.open(os.path.join(self.basedir, filename))) # open and make tensor
         return letter,x
 
+
 """
 Module testing
 """
