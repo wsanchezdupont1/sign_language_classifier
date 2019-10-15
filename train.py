@@ -209,15 +209,14 @@ if __name__ == "__main__":
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
     parser.add_argument('--val_batchsize',type=str,default=32,help='(int) Validation dataloader batch size | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
-    parser.add_argument('--log_basedir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs",help="(str) project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
-    parser.add_argument('--logdir',type=str,default="run1",help="(str) subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
-    parser.add_argument('-lf','--log_freq',type=int,default=100,help="(int) logging frequency (number of batches")
-    parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) validation batch frequency")
+    parser.add_argument('--log_basedir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
+    parser.add_argument('--logdir',type=str,default="run1",help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
+    parser.add_argument('-lf','--log_freq',type=int,default=100,help="(int) Logging frequency (number of batches")
+    parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) Validation batch frequency")
+    parser.add_argument('--num_workers',type=int,default=0,help="(int) Number of DataLoader cpu workers | default: 0")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
-
-    # optimizer args
-    # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
+    # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
 
     # add more args here as features are added...
 
@@ -233,9 +232,9 @@ if __name__ == "__main__":
 
     # initialize dataloader
     dataset = datasets.ASLAlphabet(type='train')
-    train_dataloader = DataLoader(dataset,batch_size=opts.batchsize,shuffle=True)
+    train_dataloader = DataLoader(dataset,batch_size=opts.batchsize,shuffle=True,num_workers=opts.num_workers)
     dataset = datasets.ASLAlphabet(type='val')
-    val_dataloader = DataLoader(dataset,batch_size=opts.val_batchsize,shuffle=True)
+    val_dataloader = DataLoader(dataset,batch_size=opts.val_batchsize,shuffle=True,num_workers=opts.num_workers)
 
     # initialize loss function
     lossfunc = torch.nn.CrossEntropyLoss(reduction='none')
