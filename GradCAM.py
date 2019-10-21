@@ -43,7 +43,7 @@ class GradCAM(nn.Module):
         self.fh = [] # module forward hook
         self.bh = [] # module backward hook
 
-    def forward(self,x,layerNum=None):
+    def forward(self,x,layer=None):
         """
         forward
 
@@ -51,17 +51,15 @@ class GradCAM(nn.Module):
 
         inputs:
             x - (torch.Tensor) input image to compute CAMs for.
-            layerNum - (int) index of element within model to compute CAMs for.
-                       Used as index of self.model (i.e. the hook is applied to
-                       self.model[layerNum]. If None, use inputs
+            layer - (torch.nn.Module) self.model submodule to extract activations from
         """
         self.input = x.to(self.device)
 
-        if layerNum is None:
+        if layer is None:
             self.activation = self.input # treat inputs as activation maps
 
         # hook registration
-        self.sethooks(layerNum)
+        self.sethooks(layer)
 
         self.result = self.model(self.input) # store result (already on device)
         self.gradCAMs = torch.empty(0) # NOTE: leave on cpu
@@ -95,21 +93,19 @@ class GradCAM(nn.Module):
 
 
         self.bh.remove()
-        if layerNum is not None:
+        if layer is not None:
             self.fh.remove()
-
-        print('hooks removed')
 
         return self.gradCAMs.permute(1,0,2,3)
 
-    def sethooks(self,layerNum=None):
+    def sethooks(self,layer=None):
         """
         sethooks
 
         Set hooks for each layer.
 
         inputs:
-            layerNm - (int) index value of self.model to compute CAMs for (i.e. self.model[layerNum])
+            layer - (torch.nn.Module) submodule of self.module to be hooked
         """
         # define hook functions
         def getactivation(mod,input,output):
@@ -150,13 +146,13 @@ class GradCAM(nn.Module):
             self.grad = g
 
 
-        if layerNum is None: # if using inputs
+        if layer is None: # if using inputs as activation maps
             self.activation.requires_grad=True # make sure grads are available
             self.bh = self.activation.register_hook(getgrad_input) # save gradient
         else:
-            # fwd + back hooks on layerNum module
-            self.fh = self.model[layerNum].register_forward_hook(getactivation)
-            self.bh = self.model[layerNum].register_backward_hook(getgrad)
+            # fwd + back hooks on layer module
+            self.fh = layer.register_forward_hook(getactivation)
+            self.bh = layer.register_backward_hook(getgrad)
 
 
 class Flatten(torch.nn.Module):
@@ -202,7 +198,7 @@ if __name__ == '__main__':
     x = torch.rand(6,3,4,4)
     m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2), torch.nn.ReLU(), Flatten(), torch.nn.Linear(4*3*3,4))
     GC = GradCAM(m)
-    maps = GC(x,layerNum=0)
+    maps = GC(x,layer=None)
 
     plt.subplot(1,2,1)
     plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
