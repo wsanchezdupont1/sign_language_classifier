@@ -8,8 +8,8 @@ Notes:
 
 - Currently only works on torch.nn.Sequentials or torch.nn.ModuleLists.
 
-TODO:
-- Generalize to modules with multiple outputs (hooks, etc.)
+TODO: Generalize to modules with multiple outputs (hooks, etc.)
+TODO: use layerNames instead of layerNum for grad-cam access
 
 """
 
@@ -90,7 +90,6 @@ class GradCAM(nn.Module):
             coeffs = self.grad.sum(-1).sum(-1) / (self.grad.size(2) * self.grad.size(3)) # coeffs has size = self.activations.size(1)
             prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activation # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
             cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
-            print('cam.shape =',cam.shape)
             self.gradCAMs = torch.cat([self.gradCAMs, cam.unsqueeze(0).to('cpu')],dim=0) # add CAMs to function output variable
             self.model.zero_grad() # clear gradients for next backprop
 
