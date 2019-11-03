@@ -16,7 +16,7 @@ TODO: use layerNames instead of layerNum for grad-cam access
 import torch
 import torch.nn as nn
 
-class GradCAM(nn.Module):
+class GradCAM():
     """
     GradCAM
 
@@ -30,8 +30,6 @@ class GradCAM(nn.Module):
             model - (torch.nn.Module) Indexable module to perform grad-cam on (e.g. torch.nn.Sequential)
             device - (str) device to perform computations on
         """
-        super(GradCAM,self).__init__()
-
         self.device = device
         self.input = torch.empty(0)
         self.model = model
@@ -43,7 +41,7 @@ class GradCAM(nn.Module):
         self.fh = [] # module forward hook
         self.bh = [] # module backward hook
 
-    def forward(self,x,layer=None):
+    def __call__(self,x,layer=None):
         """
         forward
 
@@ -51,7 +49,7 @@ class GradCAM(nn.Module):
 
         inputs:
             x - (torch.Tensor) input image to compute CAMs for.
-            layer - (torch.nn.Module) self.model submodule to extract activations from
+            layer - (torch.nn.Module) submodule of self.model to extract activations from
         """
         self.input = x.to(self.device)
 
