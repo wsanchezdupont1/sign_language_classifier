@@ -76,6 +76,7 @@ class GradCAM():
         #         self.model.zero_grad() # clear gradients for next backprop
 
 
+        # grad and CAM computations
         summed = self.result.sum(dim=0) # sum out batch
         for c in range(self.result.size(1)):
             if c == self.result.size(1)-1:
