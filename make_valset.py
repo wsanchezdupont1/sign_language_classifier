@@ -2,19 +2,19 @@
 
 make_valset.py
 
-Make the validation set by moving some images from ..\\asl_alphabet\\train to ..\\asl_alphabet\\val.
+Make the validation set by moving some images from /train to /val.
 
 """
 import numpy as np
 import os
 
-def make_validation_set(traindir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/train",
-                        valdir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/val",
+def make_validation_set(traindir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/train",
+                        valdir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/val",
                         val_frac=0.15):
     """
     make_validation_set
 
-    Make the validation set by moving some images from ..\\asl_alphabet\\train to ..\\asl_alphabet\\val.
+    Make the validation set by moving some images from traindir to valdir.
     Transfers np.floor(3000*val_frac) samples from each class into valdir. Uniformly samples images
     from class folders.
 
@@ -24,6 +24,9 @@ def make_validation_set(traindir="/home/wjsd/Desktop/Coding projects/sign_langua
         valdir - (str) directory to move validation images to
         val_frac - (float) fraction of training images to move to val folder. Equal number of samples per class.
     """
+
+    if len(os.listdir(valdir)) == 0: # TODO: find a better criterion?
+        make_empty_letterdirs(traindir=traindir,valdir=valdir)
 
     #
     # 29 class directories,3000 samples per directory
@@ -48,5 +51,21 @@ def make_validation_set(traindir="/home/wjsd/Desktop/Coding projects/sign_langua
             os.rename(src,dest) # transfer file
 
     return valdir
+
+def make_empty_letterdirs(traindir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/train",
+                          valdir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/val"):
+    """
+    make_empty_letterdirs
+
+    A function to create blank folders before transferring from train to val (in order to avoid "no such directory" error).
+    Made specifically to be used with make_validation_set function.
+
+    inputs:
+        traindir - training data directory
+        valdir - validation data directory
+    """
+    letters = os.listdir(traindir)
+    for letter in letters:
+        os.mkdir(os.path.join(valdir,letter))
 
 make_validation_set() # create val set

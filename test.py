@@ -21,9 +21,10 @@ import matplotlib.pyplot as plt
 import os
 
 parser = ArgumentParser()
-parser.add_argument('--filename',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs\\run2\\state_dicts\\net_state_dict_epoch1.pth",help="(str) filepath to network state dictionary")
+parser.add_argument('--filename',type=str,default="/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs/run2/state_dicts/net_state_dict_epoch7.pth",help="(str) filepath to network state dictionary")
 parser.add_argument('--batchsize',type=int,default=36,help="Batch size")
 parser.add_argument('--ntestbatches',type=int,default=10,help="Number of test batches to evaluate accuracy on")
+# TODO: cams by batch
 parser.add_argument('-cbb','--cams_by_batch',action='store_true',help="If flagged, make image grid by batch rather than by letter")
 parser.add_argument('--device',type=str,default='cuda',help="Device to compute on")
 opts = parser.parse_args()
@@ -69,7 +70,7 @@ cams = torch.nn.Upsample(scale_factor=2,mode='bilinear')(cams[0])
 print('cams.shape =',cams.shape)
 
 imlist = [cam for cam in cams] # convert first dim into list
-dirs = os.listdir('..\\asl_alphabet\\train\\')
+dirs = os.listdir('/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/train')
 print('dirs =',dirs)
 dirs.sort()
 print('sorted dirs =',dirs)

@@ -22,7 +22,7 @@ def train(net,
           batchsize=32,
           numepochs=1,
           device='cuda',
-          log_basedir='C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs',
+          log_basedir='/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs',
           logdir='run1',
           log_frequency=100,
           val_frequency=100

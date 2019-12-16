@@ -25,7 +25,7 @@ class ASLAlphabet(Dataset):
     A dataset class for a Kaggle ASL alphabet dataset. Link: https://www.kaggle.com/grassknoted/asl-alphabet.
     Works for training and validation.
     """
-    def __init__(self,basedir='/home/wjsd/Desktop/Coding projects/sign_language_classifier',type='train'):
+    def __init__(self,basedir='/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet',type='train'):
         """
         __init__
 
@@ -87,7 +87,7 @@ class TestASLAlphabet(Dataset):
     Notes:
         - Contains one example from each class, excluding "del"
     """
-    def __init__(self,basedir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/test"):
+    def __init__(self,basedir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/test"):
         """
         __init__
 
