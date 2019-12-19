@@ -2,11 +2,18 @@
 
 Willis Sanchez-duPont
 
-Grad-CAM implementation (ARXIV LINK HERE).
+Implementation of Grad-CAM (https://arxiv.org/abs/1610.02391).
 
 Notes:
 
-- Currently only works on torch.nn.Sequentials or torch.nn.ModuleLists.
+- (batch summing) In order to be able to process a batch of examples at once,
+  we can sum out the batch dimension of the model output and then call .backward()
+  on each class, rather than call the .backward() function  B samples * C classes
+  number of times. The gradient of the class output w.r.t each activation map pixel
+  is unchanged by this operation (i.e. in backprop we take each output and pass
+  it thru a sum operator, and the local gradient of the sum operation w.r.t. its
+  inputs is one, so the chain rule leaves dC_i/da_abcd intact where a,b,c, and d
+  are indices for batch, channel, row, and column respectively and C_i is class i)
 
 TODO: Generalize to modules with multiple outputs (hooks, etc.)
 TODO: use layerNames instead of layerNum for grad-cam access
@@ -60,36 +67,21 @@ class GradCAM():
         # hook registration
         self.sethooks(layer)
 
+        # forward pass
         self.results = self.model(self.inputs) # store result (already on device)
         self.gradCAMs = torch.empty(0)
 
-
-        # for each batch element + class, compute and store maps
-        # for n in range(self.results.size(0)):
-        #     for c in range(self.results.size(1)):
-        #         self.results[n][c].backward(retain_graph=True)
-        #         print('self.grads.shape =',self.grads.shape)
-        #         coeffs = self.grads[n].sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = self.activations.size(1)
-        #         print('coeffs.shape =',coeffs.shape)
-        #         prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activations[n] # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
-        #         cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
-        #         self.gradCAMs = torch.cat([self.gradCAMs, cam.unsqueeze(0).to('cpu')],dim=0) # add CAMs to function output variable
-        #         self.model.zero_grad() # clear gradients for next backprop
-
-
-
-        # TODO: determine whether code below is correct
-
         # grad and CAM computations
-        summed = self.results.sum(dim=0) # sum out batch results. Backpropagated grad from sum is just one, so grads are uninfluenced by this operation
+        summed = self.results.sum(dim=0) # sum out batch results. See note at top of file
 
         # retain graph if not on last iteration
-        for c in range(self.results.size(1)):
+        for c in range(self.results.size(1)): # loop thru classes
             if c == self.results.size(1)-1:
                 summed[c].backward()
             else:
-                summed[c].backward(retain_graph=True)
+                summed[c].backward(retain_graph=True) # retain graph to be able to backprop without calling forward again
 
+            # see paper for details on math
             coeffs = self.grads.sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = self.activations.size(1)
             prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activations # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
             cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
@@ -197,14 +189,17 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
     import numpy as np
 
+    from torchvision import models
 
     '''
     Basic test with dummy inputs/model.
     '''
-    x = torch.rand(6,3,4,4)
+    x = torch.rand(2,3,4,4)
     m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2), torch.nn.ReLU(), Flatten(), torch.nn.Linear(4*3*3,4))
     GC = GradCAM(m)
     maps = GC(x,layer=None)
+
+    maps1 = GC(x[0].unsqueeze(0),layer=None)
 
     plt.subplot(1,2,1)
     plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
