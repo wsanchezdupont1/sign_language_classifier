@@ -55,7 +55,7 @@ class GradCAM():
         inputs:
             x - (torch.Tensor) input image to compute CAMs for.
             submodule - (str or torch.nn.Module) name of module to get CAMs from OR submodule object to hook directly
-            classes - (list) list of indices specifying which classes to compute grad-CAM for (MUST CONTAIN UNIQUE ELEMENTS)
+            classes - (list) list of indices specifying which classes to compute grad-CAM for (MUST CONTAIN UNIQUE ELEMENTS). CAMs are returned in same order as specified in classes.
         """
         self.inputs = x.to(self.device)
 
@@ -82,9 +82,7 @@ class GradCAM():
                 summed[c].backward(retain_graph=True) # retain graph to be able to backprop without calling forward again
 
             # see paper for details on math
-            # print('self.grads.shape =',self.grads.shape)
-            print('processing class: ',c)
-            coeffs = self.grads.sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = self.activations.size(1)
+            coeffs = self.grads.sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = (batchsize, activations.shape(1)
             prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activations # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
             cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
             self.gradCAMs = torch.cat([self.gradCAMs, cam.unsqueeze(0).to('cpu')],dim=0) # add CAMs to function output variable
