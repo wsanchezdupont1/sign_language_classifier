@@ -2,14 +2,18 @@
 
 Willis Sanchez-duPont
 
-Grad-CAM implementation (ARXIV LINK HERE).
+Implementation of Grad-CAM (https://arxiv.org/abs/1610.02391).
 
 Notes:
 
-- Currently only works on torch.nn.Sequentials or torch.nn.ModuleLists.
-
-TODO: Generalize to modules with multiple outputs (hooks, etc.)
-TODO: use layerNames instead of layerNum for grad-cam access
+- (batch summing) In order to be able to process a batch of examples at once,
+  we can sum out the batch dimension of the model output and then call .backward()
+  on each class, rather than call the .backward() function  B samples * C classes
+  number of times. The gradient of the class output w.r.t each activation map pixel
+  is unchanged by this operation (i.e. in backprop we take each output and pass
+  it thru a sum operator, and the local gradient of the sum operation w.r.t. its
+  inputs is one, so the chain rule leaves dC_i/da_abcd intact where a,b,c, and d
+  are indices for batch, channel, row, and column respectively and C_i is class i)
 
 """
 
@@ -31,93 +35,86 @@ class GradCAM():
             device - (str) device to perform computations on
         """
         self.device = device
-        self.input = torch.empty(0)
+        self.inputs = torch.empty(0)
         self.model = model
         model.to(self.device) # push params to device
-        self.activation = torch.empty(0) # initialize activation maps
-        self.grad = torch.empty(0) # initialize gradient maps
-        self.result = torch.empty(0) # network output holder
+
+        self.activations = torch.empty(0) # initialize activation maps
+        self.grads = torch.empty(0) # initialize gradient maps
+        self.results = torch.empty(0) # network output holder
         self.gradCAMs = torch.empty(0) # output maps
         self.fh = [] # module forward hook
         self.bh = [] # module backward hook
 
-    def __call__(self,x,layer=None):
+    def __call__(self,x,submodule=None):
         """
-        forward
+        __call__
 
-        Compute class activation maps for a given input and layer.
+        Compute class activation maps for a given input and submodule.
 
         inputs:
             x - (torch.Tensor) input image to compute CAMs for.
-            layer - (torch.nn.Module) submodule of self.model to extract activations from
+            submodule - (str or torch.nn.Module) name of module to get CAMs from OR submodule object to hook directly
         """
-        self.input = x.to(self.device)
+        self.inputs = x.to(self.device)
 
-        if layer is None:
-            self.activation = self.input # treat inputs as activation maps
+        if submodule is None:
+            self.activations = self.inputs # treat inputs as activation maps
 
         # hook registration
-        self.sethooks(layer)
+        self.sethooks(submodule)
 
-        self.result = self.model(self.input) # store result (already on device)
-        self.gradCAMs = torch.empty(0) # NOTE: leave on cpu
+        # forward pass
+        self.results = self.model(self.inputs) # store result (already on device)
+        self.gradCAMs = torch.empty(0)
 
+        # grad and CAM computations
+        summed = self.results.sum(dim=0) # sum out batch results. See note at top of file
 
-        # for each batch element + class, compute and store maps
-        # for n in range(self.result.size(0)):
-        #     for c in range(self.result.size(1)):
-        #         self.result[n][c].backward(retain_graph=True)
-        #         print('self.grad.shape =',self.grad.shape)
-        #         coeffs = self.grad[n].sum(-1).sum(-1) / (self.grad.size(2) * self.grad.size(3)) # coeffs has size = self.activations.size(1)
-        #         print('coeffs.shape =',coeffs.shape)
-        #         prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activation[n] # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
-        #         cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
-        #         self.gradCAMs = torch.cat([self.gradCAMs, cam.unsqueeze(0).to('cpu')],dim=0) # add CAMs to function output variable
-        #         self.model.zero_grad() # clear gradients for next backprop
-
-
-        summed = self.result.sum(dim=0) # sum out batch
-        for c in range(self.result.size(1)):
-            if c == self.result.size(1)-1:
+        # retain graph if not on last iteration
+        for c in range(self.results.size(1)): # loop thru classes
+            if c == self.results.size(1)-1:
                 summed[c].backward()
             else:
-                summed[c].backward(retain_graph=True)
+                summed[c].backward(retain_graph=True) # retain graph to be able to backprop without calling forward again
 
-            coeffs = self.grad.sum(-1).sum(-1) / (self.grad.size(2) * self.grad.size(3)) # coeffs has size = self.activations.size(1)
-            prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activation # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
+            # see paper for details on math
+            print('self.grads.shape =',self.grads.shape)
+            coeffs = self.grads.sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = self.activations.size(1)
+            prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activations # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
             cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
             self.gradCAMs = torch.cat([self.gradCAMs, cam.unsqueeze(0).to('cpu')],dim=0) # add CAMs to function output variable
             self.model.zero_grad() # clear gradients for next backprop
 
 
         self.bh.remove()
-        if layer is not None:
+        if submodule is not None:
             self.fh.remove()
 
         return self.gradCAMs.permute(1,0,2,3)
 
-    def sethooks(self,layer=None):
+    def sethooks(self,submodule=None):
         """
         sethooks
 
         Set hooks for each layer.
 
         inputs:
-            layer - (torch.nn.Module) submodule of self.module to be hooked
+            submodule - (str or torch.nn.Module) name of submodule within self.model to hook OR submodule to hook directly
         """
         # define hook functions
         def getactivation(mod,input,output):
             """
             getactivation
 
-            Copy activations to self.activation on forward pass.
+            Copy activations to self.activations on forward pass.
 
             inputs:
                 mod - (torch.nn.Module) module being hooked
-                input - (tuple) inputs to layer being hooked
-                output - (tensor) output of layer being hooked (NOTE: if module has multiple outputs this may be a tuple.)
+                input - (tuple) inputs to submodule being hooked (ignore)
+                output - (tensor) output of submodule being hooked (NOTE: untested for modules with multiple outputs)
             """
-            self.activation = output
+            self.activations = output
 
         def getgrad(mod,gradin,gradout):
             """
@@ -127,10 +124,10 @@ class GradCAM():
 
             inputs:
                 mod - (torch.nn.Module) module being hooked
-                gradin - (tuple) inputs to last operation in mod
-                gradout - (tuple) tuple of accumulated gradients w.r.t. outputs of mod
+                gradin - (tuple) inputs to last operation in mod (ignore)
+                gradout - (tuple) gradients of class activation w.r.t. outputs of mod
             """
-            self.grad = gradout[0]
+            self.grads = gradout[0]
 
         def getgrad_input(g):
             """
@@ -141,16 +138,20 @@ class GradCAM():
             inputs:
                 g - (torch.Tensor) tensor to set/store as gradient on backward pass
             """
-            self.grad = g
+            self.grads = g
 
 
-        if layer is None: # if using inputs as activation maps
-            self.activation.requires_grad=True # make sure grads are available
-            self.bh = self.activation.register_hook(getgrad_input) # save gradient
+        if submodule is None: # if using inputs as activation maps
+            self.activations.requires_grad=True # make sure input grads are available
+            self.bh = self.activations.register_hook(getgrad_input) # save gradient
+        elif type(submodule) == type(""): # if using string name of submodule...
+            for name,module in self.model._modules.items():
+                if name == submodule:
+                    self.fh = module.register_forward_hook(getactivation) # forward hook
+                    self.bh = module.register_backward_hook(getgrad) # backward hook
         else:
-            # fwd + back hooks on layer module
-            self.fh = layer.register_forward_hook(getactivation)
-            self.bh = layer.register_backward_hook(getgrad)
+            self.fh = submodule.register_forward_hook(getactivation) # forward hook
+            self.bh = submodule.register_backward_hook(getgrad) # backward hook
 
 
 class Flatten(torch.nn.Module):
@@ -189,14 +190,22 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
     import numpy as np
 
+    from torchvision import models
 
     '''
     Basic test with dummy inputs/model.
     '''
-    x = torch.rand(6,3,4,4)
-    m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2), torch.nn.ReLU(), Flatten(), torch.nn.Linear(4*3*3,4))
+    x = torch.rand(2,3,4,4)
+    m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2),
+                            torch.nn.ReLU(),
+                            torch.nn.Conv2d(4,4,3,padding=1),
+                            torch.nn.ReLU(),
+                            Flatten(),
+                            torch.nn.Linear(4*3*3,4))
     GC = GradCAM(m)
-    maps = GC(x,layer=None)
+    maps = GC(x,submodule=None)
+
+    maps1 = GC(x[0].unsqueeze(0),submodule=m._modules['2'])
 
     plt.subplot(1,2,1)
     plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
