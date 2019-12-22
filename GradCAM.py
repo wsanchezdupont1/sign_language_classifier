@@ -46,7 +46,7 @@ class GradCAM():
         self.fh = [] # module forward hook
         self.bh = [] # module backward hook
 
-    def __call__(self,x,submodule=None):
+    def __call__(self,x,submodule=None,classes='all'):
         """
         __call__
 
@@ -55,6 +55,7 @@ class GradCAM():
         inputs:
             x - (torch.Tensor) input image to compute CAMs for.
             submodule - (str or torch.nn.Module) name of module to get CAMs from OR submodule object to hook directly
+            classes - (list) list of indices specifying which classes to compute grad-CAM for (MUST CONTAIN UNIQUE ELEMENTS)
         """
         self.inputs = x.to(self.device)
 
@@ -72,14 +73,17 @@ class GradCAM():
         summed = self.results.sum(dim=0) # sum out batch results. See note at top of file
 
         # retain graph if not on last iteration
-        for c in range(self.results.size(1)): # loop thru classes
-            if c == self.results.size(1)-1:
+        if classes == 'all':
+            classes = [x for x in range(self.results.size(1))] # list of all classes
+        for c in classes: # loop thru classes
+            if c == classes[-1]:
                 summed[c].backward()
             else:
                 summed[c].backward(retain_graph=True) # retain graph to be able to backprop without calling forward again
 
             # see paper for details on math
-            print('self.grads.shape =',self.grads.shape)
+            # print('self.grads.shape =',self.grads.shape)
+            print('processing class: ',c)
             coeffs = self.grads.sum(-1).sum(-1) / (self.grads.size(2) * self.grads.size(3)) # coeffs has size = self.activations.size(1)
             prods = coeffs.unsqueeze(-1).unsqueeze(-1)*self.activations # align dims to get appropriate linear combination of feature maps (which reside in dim=1 of self.activations)
             cam = torch.nn.ReLU()(prods.sum(dim=1)) # sum along activation dimensions (result size = batchsize x U x V)
@@ -203,9 +207,9 @@ if __name__ == '__main__':
                             Flatten(),
                             torch.nn.Linear(4*3*3,4))
     GC = GradCAM(m)
-    maps = GC(x,submodule=None)
+    maps = GC(x,submodule=None) # test using inputs as activations
 
-    maps1 = GC(x[0].unsqueeze(0),submodule=m._modules['2'])
+    maps1 = GC(x[0].unsqueeze(0),submodule=m._modules['2']) # test using direct submodule hooks
 
     plt.subplot(1,2,1)
     plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
