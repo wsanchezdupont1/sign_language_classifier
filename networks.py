@@ -47,6 +47,8 @@ class SLClassifier(nn.Module):
         self.conv8 = nn.Conv2d(16,16,3,stride=2) # output shape (10,10)
         self.norm4 = nn.BatchNorm2d(num_features=16)
 
+        self.flat = Flatten()
+
         self.fc1 = nn.Linear(1600,800)
         self.norm5 = nn.BatchNorm1d(num_features=800)
         self.fc2 = nn.Linear(800,400)
@@ -90,7 +92,7 @@ class SLClassifier(nn.Module):
         x = self.norm4(x)
 
         # reshape
-        x = x.view(-1,1600)
+        x = self.flat(x)
         x = self.fc1(x)
         x = torch.tanh(x)
         x = self.norm5(x)
@@ -103,6 +105,32 @@ class SLClassifier(nn.Module):
         result = self.fc4(x) # raw network scores
 
         return result
+
+class Flatten(torch.nn.Module):
+    """
+    Flatten
+
+    torch.view as a layer.
+    """
+    def __init__(self,start_dim=1):
+        """
+        __init__
+
+        Constructor.
+
+        inputs:
+        start_idm - (bool) dimension to begin flattening at.
+        """
+        super(Flatten,self).__init__()
+        self.start_dim = start_dim
+
+    def forward(self,x):
+        """
+        forward
+
+        Forward pass.
+        """
+        return x.flatten(self.start_dim)
 
 """
 Run module as script (for testing, mostly).
