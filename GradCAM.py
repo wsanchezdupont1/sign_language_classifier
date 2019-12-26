@@ -15,8 +15,16 @@ Notes:
   inputs is one, so the chain rule leaves dC_i/da_abcd intact where a,b,c, and d
   are indices for batch, channel, row, and column respectively and C_i is class i)
 
+- (dog example) This repo uses the same examples as https://github.com/jacobgil/pytorch-grad-cam
+  Note that the generated CAM for the bull mastiff class (243) produces a result different from
+  "dog.jpg". Not totally sure why this is the case, however cloning the previously mentioned
+  repo and running grad-cam.py results in the same image as the one produced by the code in this
+  file (perhaps that image was generated from a previous version of their code?).
+  Also note that "cat.jpg" is identical to the results from this repo.
+
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -56,6 +64,9 @@ class GradCAM():
             x - (torch.Tensor) input image to compute CAMs for.
             submodule - (str or torch.nn.Module) name of module to get CAMs from OR submodule object to hook directly
             classes - (list) list of indices specifying which classes to compute grad-CAM for (MUST CONTAIN UNIQUE ELEMENTS). CAMs are returned in same order as specified in classes.
+
+        outputs:
+            self.gradCAMs - (torch.ndarray) numpy.ndarray of shape (batch,classes,u,v) where u and v are the activation map dimensions
         """
         self.inputs = x.to(self.device)
 
@@ -89,11 +100,14 @@ class GradCAM():
             self.model.zero_grad() # clear gradients for next backprop
 
 
+        # remove hooks
         self.bh.remove()
         if submodule is not None:
             self.fh.remove()
 
-        return self.gradCAMs.permute(1,0,2,3)
+        self.gradCAMs = self.gradCAMs.permute(1,0,2,3).detach().numpy() # batch first, requires_grad=False, and convert to numpy array
+
+        return self.gradCAMs
 
     def sethooks(self,submodule=None):
         """
@@ -151,7 +165,7 @@ class GradCAM():
                 if name == submodule:
                     self.fh = module.register_forward_hook(getactivation) # forward hook
                     self.bh = module.register_backward_hook(getgrad) # backward hook
-        else:
+        else: # if using the submodule itself
             self.fh = submodule.register_forward_hook(getactivation) # forward hook
             self.bh = submodule.register_backward_hook(getgrad) # backward hook
 
@@ -182,6 +196,35 @@ class Flatten(torch.nn.Module):
         """
         return x.flatten(self.start_dim)
 
+def create_masked_image(x,cam,filename='examples/testimage.jpg'):
+    """
+    similar to show_cam_on_image from https://github.com/jacobgil/pytorch-grad-cam
+    """
+    mask = cv2.applyColorMap(np.uint8(cam*255),cv2.COLORMAP_JET)
+    mask = np.float32(mask) / 255
+    mask = mask + np.float32(x)
+    mask = mask / np.max(mask)
+    if filename is not None:
+        cv2.imwrite(filename,np.uint8(mask*255))
+
+def preprocess_image(img):
+    """
+    Copied from https://github.com/jacobgil/pytorch-grad-cam grad-cam.py
+    """
+    means=[0.485, 0.456, 0.406]
+    stds=[0.229, 0.224, 0.225]
+
+    preprocessed_img = img.copy()[: , :, ::-1]
+    for i in range(3):
+        preprocessed_img[:, :, i] = preprocessed_img[:, :, i] - means[i]
+        preprocessed_img[:, :, i] = preprocessed_img[:, :, i] / stds[i]
+    preprocessed_img = \
+        np.ascontiguousarray(np.transpose(preprocessed_img, (2, 0, 1)))
+    preprocessed_img = torch.from_numpy(preprocessed_img)
+    preprocessed_img.unsqueeze_(0)
+    input = Variable(preprocessed_img, requires_grad = True)
+    return input
+
 """
 MODULE TESTING
 """
@@ -191,26 +234,53 @@ if __name__ == '__main__':
     '''
     from matplotlib import pyplot as plt
     import numpy as np
-
-    from torchvision import models
+    from torchvision.models import vgg19
+    import cv2
+    from torch.autograd import Variable,Function
 
     '''
     Basic test with dummy inputs/model.
     '''
-    x = torch.rand(2,3,4,4)
-    m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2),
-                            torch.nn.ReLU(),
-                            torch.nn.Conv2d(4,4,3,padding=1),
-                            torch.nn.ReLU(),
-                            Flatten(),
-                            torch.nn.Linear(4*3*3,4))
-    GC = GradCAM(m)
-    maps = GC(x,submodule=None) # test using inputs as activations
+    basicTesting = False
+    if basicTesting:
+        x = torch.rand(2,3,4,4)
+        m = torch.nn.Sequential(torch.nn.Conv2d(3,4,2),
+                                torch.nn.ReLU(),
+                                torch.nn.Conv2d(4,4,3,padding=1),
+                                torch.nn.ReLU(),
+                                Flatten(),
+                                torch.nn.Linear(4*3*3,4))
+        GC = GradCAM(m)
+        maps = GC(x,submodule=None) # test using inputs as activations
 
-    maps1 = GC(x[0].unsqueeze(0),submodule=m._modules['2']) # test using direct submodule hooks
+        maps1 = GC(x[0].unsqueeze(0),submodule=m._modules['2']) # test using direct submodule hooks
 
-    plt.subplot(1,2,1)
-    plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
-    plt.subplot(1,2,2)
-    plt.imshow(np.array(maps[0][0].detach())) # plot map example
-    plt.show()
+        plt.subplot(1,2,1)
+        plt.imshow(np.array(x[0].permute(1,2,0))) # plot input exapmle
+        plt.subplot(1,2,2)
+        plt.imshow(np.array(maps[0][0].detach())) # plot map example
+        plt.show()
+
+    '''
+    VGG19 test using exmaples from https://github.com/jacobgil/pytorch-grad-cam
+    '''
+
+    # this block is mostly copied/adapted from the repo linked above
+    x = cv2.imread('examples/both.png',1) # 1 for color image
+    x = np.float32(cv2.resize(x, (224,224))) / 255 # move to range [0,1]
+    im = preprocess_image(x)
+
+    # create network and set to eval mode
+    vgg = vgg19(pretrained=True)
+    vgg.eval()
+
+    # create GradCAM object and generae grad-CAMs
+    GC = GradCAM(model = vgg, device = 'cuda')
+    classes = [243,281]
+    cam = GC(im,submodule=GC.model.features._modules["35"],classes=classes)
+
+    # reshape grad-CAMs + create heatmaps + save images
+    for i in range(len(classes)):
+        mask = cv2.resize(cam[0][i],(224,224))
+        mask = (mask - np.min(mask)) / np.max(mask)
+        create_masked_image(x,mask ,filename='examples/cam_class_{}.jpg'.format(classes[i]))
