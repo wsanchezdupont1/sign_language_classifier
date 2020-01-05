@@ -16,6 +16,7 @@ from datasets import ASLAlphabet
 from networks import SLClassifier
 from argparse import ArgumentParser
 from GradCAM import GradCAM
+import cv2
 
 import matplotlib.pyplot as plt
 import os
@@ -63,7 +64,8 @@ print('accs = ',accs)
 
 # test grad-cam
 GC = GradCAM(net,device=opts.device)
-cams = GC(samples,layer=net.conv6).unsqueeze(2).detach() # add channel dim
+samples.requires_grad = True
+cams = GC(samples,submodule=net.conv6,guided=opts.guided).unsqueeze(2).detach() # add channel dim
 print('cams.shape =',cams.shape)
 
 cams = torch.nn.Upsample(scale_factor=2,mode='bilinear')(cams[0])
