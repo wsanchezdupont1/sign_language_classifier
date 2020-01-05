@@ -7,12 +7,19 @@ train.py
 Training script for sign language classifier.
 
 """
-import os
-from argparse import ArgumentParser
+# custom imports
 import datasets
 import networks
+
+# pytorch stuff
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+# misc imports
+import os
+from argparse import ArgumentParser
+import time
 
 def train(net,
           optimizer,
@@ -23,9 +30,9 @@ def train(net,
           numepochs=1,
           device='cuda',
           log_basedir='/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs',
-          logdir='run1',
+          log_subdir='run0',
           log_frequency=100,
-          val_frequency=100
+          val_frequency=100,
           ):
     """
     train
@@ -41,19 +48,17 @@ def train(net,
         numepochs - (int) number of epochs to train on
         device - (str) device to perform computations on
         log_basedir - (str) project logging folder that holds all logs (e.g. "C:\\Users...\\project_name\logs")
-        logdir - (str) subdirectory of log_basedir specifying the storage folder for _this_ experiment (e.g. "run1")
+        log_subdir - (str) subdirectory of log_basedir specifying the storage folder for _this_ experiment (e.g. "run1")
         log_frequency - (int) logging frequency (in number of batches)
         val_frequency - (int) process validation batch every val_frequency samples
 
     """
-    from torch.utils.tensorboard import SummaryWriter
-    import time
 
     net.to(device) # move params to device
     print('[ network pushed to device ]')
 
-    logpath = os.path.join(log_basedir,logdir)
-    s = SummaryWriter(log_dir=logpath) # start tensorboard writer
+    logpath = os.path.join(log_basedir,log_subdir)
+    s = SummaryWriter(log_dir=os.path.join(logpath,'training')) # start tensorboard writer
 
     # create state_dict log folder if it doesn't exist
     state_dict_path = os.path.join(logpath,'state_dicts')
@@ -61,6 +66,7 @@ def train(net,
         os.mkdir(state_dict_path)
 
 
+    # TODO: use real image
     # load graph of net with dummy input image
     s.add_graph(net,torch.rand(1,3,200,200).to(device))
 
@@ -68,25 +74,24 @@ def train(net,
     print('----------------------------------------------------------------')
     t_start = time.time() # record
 
-    val_dataloader_it = iter(val_dataloader) # use this to load validation batches when we want
+    if val_frequency is not None:
+        val_dataloader_it = iter(val_dataloader) # use this to load validation batches when we want
+        v = SummaryWriter(log_dir=os.path.join(logpath,'validation'))
 
     batches_processed = 0
     logstep = 0 # the "global_step" variable for tensorboard logging
     for epoch in range(numepochs):
         for i,batch in enumerate(train_dataloader):
-
-            # TODO: time cpu load and gpu computations
-
-            cpu_start = time.time()
+            # start device transfer timing
+            transfer_start = time.time()
             # sample and move to device
             labels,samples = batch
             samples = samples.to(device)
             labels = labels.to(device)
+            transfer_time = time.time() - transfer_start # record cpu dataload time
 
-            cpu_time = time.time - cpu_start() # record cpu dataload time
-
-            gpu_start = time.time()
             # gpu computations
+            compute_start = time.time()
             scores = net(samples)
             probs = scores.softmax(dim=1)
 
@@ -103,10 +108,9 @@ def train(net,
             loss_mean.backward()
             optimizer.step()
 
-            gpu_time = time.time() - gpu_start
+            compute_time = time.time() - compute_start
 
             batches_processed += 1
-
 
             #
             # Tensorboard logging
@@ -114,12 +118,13 @@ def train(net,
             if batches_processed % log_frequency == 0:
                 print('logstep =',logstep)
                 print('batches_processed =',batches_processed)
-                print('epoch_progress =',batchsize*batches_processed/(2550*29)) # TODO: remove hardcoded 2550 samples/class
+                print('epoch_progress =',batchsize*batches_processed/(2550*29)) # TODO: remove hardcoded 2550 samples/class * 29 classes
                 print('samples_processed =',batchsize*batches_processed)
 
+                # TODO: make sure this is working fully
                 # log time for log_freq batches
                 t_end = time.time()
-                s.add_scalars('times',dict('%dbatch' % log_frequency=t_end-t_start,cpu_time=cpu_time,gpu_time=gpu_time),logstep)
+                s.add_scalars('times',{'batches_{}'.format(log_frequency):t_end-t_start, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
                 t_start = t_end
 
                 # compute accuracy
@@ -134,12 +139,12 @@ def train(net,
                 # TODO: add histogram of weights
                 s.add_histogram('losses/batch',loss,logstep) # batch losses
 
+                # TODO: get PR curves working
                 one_hot = torch.nn.functional.one_hot(labels)
                 # sometimes 29th class isn't represented, so one_hot results in <29 columns
                 if one_hot.size(1) < 29:
                     one_hot = torch.cat([one_hot.cpu(), torch.zeros(one_hot.size(0), 29-one_hot.size(1)).long()],dim=1)
 
-                # TODO: fix this!!
                 s.add_pr_curve('pr',labels=one_hot,predictions=probs,global_step=logstep)
 
                 # gpu usage
@@ -159,30 +164,31 @@ def train(net,
             #
             # Validation
             #
+            # TODO: prevent validation StopIteration from eventually happening with DataLoader on long training runs
             # TODO: finish validation
-            #
-            if batches_processed % val_frequency == 0:
-                with torch.no_grad():
-                    labels,samples = next(val_dataloader_it)
-                    labels = labels.to(device)
-                    samples = samples.to(device)
+            if val_frequency != 0:
+                if batches_processed % val_frequency == 0:
+                    with torch.no_grad():
+                        labels,samples = next(val_dataloader_it)
+                        labels = labels.to(device)
+                        samples = samples.to(device)
 
-                    scores = net(samples)
-                    probs = scores.softmax(dim=1)
+                        scores = net(samples)
+                        probs = scores.softmax(dim=1)
 
-                    # val losses
-                    loss_val = lossfunc(scores,labels)
-                    loss_val_mean = loss_val.mean()
-                    loss_val_var = loss_val.var()
-                    s.add_scalars('losses',{'loss/val_mean':loss_val_mean,'loss/val_var':loss_val_var},logstep)
+                        # val losses
+                        loss_val = lossfunc(scores,labels)
+                        loss_val_mean = loss_val.mean()
+                        loss_val_var = loss_val.var()
+                        v.add_scalars('losses',{'val_mean':loss_val_mean,'val_var':loss_val_var},logstep)
 
-                    # val accuracy
-                    _,class_pred = probs.max(dim=1)
-                    val_acc = (class_pred==labels).sum() / float(len(labels))  # accuracy
-                    s.add_scalars('accuracies',{'validation':val_acc},logstep)
+                        # val accuracy
+                        _,class_pred = probs.max(dim=1)
+                        val_acc = (class_pred==labels).sum() / float(len(labels))  # accuracy
+                        v.add_scalars('accuracies',{'validation':val_acc},logstep)
 
         # checkpoint model every epoch
-        pth_path = os.path.join(state_dict_path, 'net_state_dict_%s%i.pth' % ('epoch',epoch))
+        pth_path = os.path.join(state_dict_path, 'net_state_dict_{}{}.pth'.format('epoch',epoch))
         torch.save(net.state_dict(),pth_path)
         print('[ model saved, path = %s ]' % pth_path)
 
@@ -209,13 +215,14 @@ if __name__ == "__main__":
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
     parser.add_argument('--val_batchsize',type=str,default=32,help='(int) Validation dataloader batch size | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
-    parser.add_argument('--log_basedir',type=str,default="C:\\Users\\Willis\\Desktop\\Sign Language Classifier\\sign_language_classifier\\trainlogs",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
-    parser.add_argument('--logdir',type=str,default="run1",help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
+    parser.add_argument('--log_basedir',type=str,default="/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs/",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
+    parser.add_argument('--log_subdir',type=str,default='run0',help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
     parser.add_argument('-lf','--log_freq',type=int,default=100,help="(int) Logging frequency (number of batches")
     parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) Validation batch frequency")
     parser.add_argument('--num_workers',type=int,default=0,help="(int) Number of DataLoader cpu workers | default: 0")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
+    parser.add_argument('--lossfunc',type=str,default='crossentropy',help="(str) Loss functiion type | default: 'crossentropy'")
     # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
 
     # add more args here as features are added...
@@ -237,7 +244,10 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(dataset,batch_size=opts.val_batchsize,shuffle=True,num_workers=opts.num_workers)
 
     # initialize loss function
-    lossfunc = torch.nn.CrossEntropyLoss(reduction='none')
+    if opts.lossfunc in ['crossentropy','crossentropyloss']:
+        lossfunc = torch.nn.CrossEntropyLoss(reduction='none')
+    else:
+        raise Exception("Loss function invalid!")
 
     train(net,
           optimizer,
@@ -248,7 +258,7 @@ if __name__ == "__main__":
           numepochs=opts.numepochs,
           device=opts.device,
           log_basedir=opts.log_basedir,
-          logdir=opts.logdir,
+          log_subdir=opts.log_subdir,
           log_frequency=opts.log_freq,
           val_frequency=opts.val_frequency)
 
