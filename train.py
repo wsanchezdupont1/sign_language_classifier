@@ -58,6 +58,10 @@ def train(net,
     print('[ network pushed to device ]')
 
     logpath = os.path.join(log_basedir,log_subdir)
+    if os.path.exists(logpath):
+        import shutil
+        shutil.rmtree(logpath)
+
     s = SummaryWriter(log_dir=os.path.join(logpath,'training')) # start tensorboard writer
 
     # create state_dict log folder if it doesn't exist
@@ -234,7 +238,7 @@ if __name__ == "__main__":
 
     # TODO: add  weight initialization!!!!
 
-    net = networks.SLClassifier() # can add network configs here later
+    net = networks.SLClassifier() # TODO: add network configs here
     optimizer = torch.optim.SGD(net.parameters(),lr=opts.lr) # SGD for now, add options later
 
     # initialize dataloader
