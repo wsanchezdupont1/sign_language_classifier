@@ -22,14 +22,13 @@ Notes:
   repo and running grad-cam.py results in the same image as the one produced by the code in this
   file (perhaps that image was generated from a previous version of their code?).
   Also note that "cat.jpg" is identical to the results from this repo.
-  - (argument parsing) For some reason, argparse insists that the -g flag comes after --classes.
-    This problem doesn't arise if you use the full flag (i.e. --guided)
 
 """
 
 import numpy as np
 import torch
 import torch.nn as nn
+import cv2
 
 class GradCAM():
     """
@@ -387,7 +386,6 @@ if __name__ == '__main__':
     '''
     VGG19 test using examples from https://github.com/jacobgil/pytorch-grad-cam for comparison
     '''
-    import cv2
     from torchvision.models import vgg19
     if opts.timer:
         import time
