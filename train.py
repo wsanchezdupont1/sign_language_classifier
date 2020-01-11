@@ -58,16 +58,11 @@ def train(net,
     print('[ network pushed to device ]')
 
     logpath = os.path.join(log_basedir,log_subdir)
-    if os.path.exists(logpath):
-        import shutil
-        shutil.rmtree(logpath)
-
     s = SummaryWriter(log_dir=os.path.join(logpath,'training')) # start tensorboard writer
 
-    # create state_dict log folder if it doesn't exist
+    # create state_dict log folder
     state_dict_path = os.path.join(logpath,'state_dicts')
-    if not os.path.exists(state_dict_path):
-        os.mkdir(state_dict_path)
+    os.mkdir(state_dict_path)
 
 
     # TODO: use real image
@@ -201,6 +196,28 @@ def train(net,
 
     return net # return the network for subsequent usage
 
+
+def saveopts(opts_filename,opts):
+    """
+    saveopts
+
+    Helper function to save parsed arguments. Saves to .txt file with the
+    following format:
+
+    arg1: value1
+    arg2: value2
+    ...
+    argN: valueN
+
+    inputs:
+        opts_filename - (str) directory inside which to save options
+        opts - (argparse.Namespace) object containing parsed options (output of parser.parse_args())
+    """
+    with open(opts_filename,'w') as f:
+        for arg,val in vars(opts).items():
+            line = '{}: {}\n'.format(arg,val)
+            f.write(line)
+
 """
 
 Run module as script.
@@ -234,10 +251,20 @@ if __name__ == "__main__":
     # parse
     opts = parser.parse_args()
 
+    # clear out log_subdir
+    logpath = os.path.join(opts.log_basedir,opts.log_subdir)
+    if os.path.exists(logpath):
+        import shutil
+        shutil.rmtree(logpath)
+    os.mkdir(logpath)
+
+    # save parsed arguments to txt file
+    opts_filename = os.path.join(logpath,'opts_{}.pth'.format(opts.log_subdir))
+    print('saving parsed arguments to .txt file: {}'.format(opts_filename))
+    saveopts(opts_filename,opts)
+
     # initialize network and optimizer
-
     # TODO: add  weight initialization!!!!
-
     net = networks.SLClassifier() # TODO: add network configs here
     optimizer = torch.optim.SGD(net.parameters(),lr=opts.lr) # SGD for now, add options later
 
@@ -272,5 +299,3 @@ if __name__ == "__main__":
     letter,sample = dataset[0]
     probs = net(sample.unsqueeze(0)).softmax(dim=1)
     print('probs =',probs)
-
-    exit()
