@@ -119,7 +119,7 @@ def train(net,
             if log_frequency != 0 and batches_processed % log_frequency == 0:
                 print('logstep =',logstep)
                 print('batches_processed =',batches_processed)
-                print('epoch_progress =',batchsize*batches_processed/(2550*29)) # TODO: remove hardcoded 2550 samples/class * 29 classes
+                print('epoch_progress =',batchsize*batches_processed/len(train_dataloader.dataset)
                 print('train_samples_processed =',batchsize*batches_processed)
 
                 # TODO: make sure this is working fully
@@ -164,8 +164,6 @@ def train(net,
             #
             # Validation
             #
-            # TODO: prevent validation StopIteration from eventually happening with DataLoader on long training runs
-            # TODO: finish validation
             if val_frequency != 0:
                 if batches_processed % val_frequency == 0 and val_frequency != 0:
                     with torch.no_grad():
