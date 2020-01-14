@@ -43,7 +43,7 @@ def train(net,
         net - (SLClassifier) Sign language classifier network
         optimizer - (torch.optim optimizer) Optimizer object created using net's parameters
         train_dataloader - (ASLAlphabet) ASLAlphabet training dataloader
-        val_dataloader - (ASLAlphabet) ASLAlphabet validation dataloader
+        val_dataloader - (ASLAlphabet) ASLAlphabet validation dataloader (note that this gets refreshed with shuffle=True when val_dataloader iterator hits stopping point)
         batchsize - (int) number of samples per batches
         numepochs - (int) number of epochs to train on
         device - (str) device to perform computations on
@@ -73,13 +73,15 @@ def train(net,
     print('----------------------------------------------------------------')
     t_start = time.time() # record
 
-    if val_frequency is not None:
+    if val_frequency is not None and val_frequency != 0:
         val_dataloader_it = iter(val_dataloader) # use this to load validation batches when we want
         v = SummaryWriter(log_dir=os.path.join(logpath,'validation'))
 
     batches_processed = 0
+    val_batches_processed = 0
     logstep = 0 # the "global_step" variable for tensorboard logging
     for epoch in range(numepochs):
+        print('epoch =',epoch)
         for i,batch in enumerate(train_dataloader):
             # start device transfer timing
             transfer_start = time.time()
@@ -114,14 +116,14 @@ def train(net,
             #
             # Tensorboard logging
             #
-            if batches_processed % log_frequency == 0:
+            if log_frequency != 0 and batches_processed % log_frequency == 0:
                 print('logstep =',logstep)
                 print('batches_processed =',batches_processed)
                 print('epoch_progress =',batchsize*batches_processed/(2550*29)) # TODO: remove hardcoded 2550 samples/class * 29 classes
-                print('samples_processed =',batchsize*batches_processed)
+                print('train_samples_processed =',batchsize*batches_processed)
 
                 # TODO: make sure this is working fully
-                # log time for log_freq batches
+                # log time for log_frequency batches
                 t_end = time.time()
                 s.add_scalars('times',{'batches_{}'.format(log_frequency):t_end-t_start, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
                 t_start = t_end
@@ -156,9 +158,8 @@ def train(net,
                 # TODO: grad-CAM
 
                 # TODO: activation distributions for layers
-
-                logstep += 1
                 print('----------------------------------------------------------------')
+
 
             #
             # Validation
@@ -166,7 +167,7 @@ def train(net,
             # TODO: prevent validation StopIteration from eventually happening with DataLoader on long training runs
             # TODO: finish validation
             if val_frequency != 0:
-                if batches_processed % val_frequency == 0:
+                if batches_processed % val_frequency == 0 and val_frequency != 0:
                     with torch.no_grad():
                         labels,samples = next(val_dataloader_it)
                         labels = labels.to(device)
@@ -186,13 +187,18 @@ def train(net,
                         val_acc = (class_pred==labels).sum() / float(len(labels))  # accuracy
                         v.add_scalars('accuracies',{'validation':val_acc},logstep)
 
+                    val_batches_processed += 1
+
+                    # reset validation dataloader if we just completed the last batch
+                    if torch.Tensor([val_batches_processed]) % torch.ceil(torch.Tensor([len(val_dataloader.dataset) / val_dataloader.batch_size])) == 0:
+                        val_dataloader_it = iter(val_dataloader)
+
+            logstep += 1
+
         # checkpoint model every epoch
-        pth_path = os.path.join(state_dict_path, 'net_state_dict_{}{}.pth'.format('epoch',epoch))
+        pth_path = os.path.join(state_dict_path, 'net_state_dict_epoch{}.pth'.format(epoch))
         torch.save(net.state_dict(),pth_path)
-        print('[ model saved, path = %s ]' % pth_path)
-
-        # TODO: add validation
-
+        print('[ model saved, path = {} ]'.format(pth_path))
 
     return net # return the network for subsequent usage
 
@@ -214,8 +220,8 @@ def saveopts(opts_filename,opts):
         opts - (argparse.Namespace) object containing parsed options (output of parser.parse_args())
     """
     with open(opts_filename,'w') as f:
-        for arg,val in vars(opts).items():
-            line = '{}: {}\n'.format(arg,val)
+        for key,val in vars(opts).items():
+            line = '{}: {}\n'.format(key,val)
             f.write(line)
 
 """
@@ -238,8 +244,8 @@ if __name__ == "__main__":
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
     parser.add_argument('--log_basedir',type=str,default="/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs/",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
     parser.add_argument('--log_subdir',type=str,default='run0',help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
-    parser.add_argument('-lf','--log_freq',type=int,default=100,help="(int) Logging frequency (number of batches")
-    parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) Validation batch frequency")
+    parser.add_argument('-lf','--log_frequency',type=int,default=100,help="(int) Logging frequency (number of batches")
+    parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) Validation batch frequency in number of training batches processed")
     parser.add_argument('--num_workers',type=int,default=0,help="(int) Number of DataLoader cpu workers | default: 0")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
@@ -263,16 +269,16 @@ if __name__ == "__main__":
     print('saving parsed arguments to .txt file: {}'.format(opts_filename))
     saveopts(opts_filename,opts)
 
+    # TODO: add  weight initialization
     # initialize network and optimizer
-    # TODO: add  weight initialization!!!!
     net = networks.SLClassifier() # TODO: add network configs here
-    optimizer = torch.optim.SGD(net.parameters(),lr=opts.lr) # SGD for now, add options later
+    optimizer = torch.optim.SGD(net.parameters(),lr=opts.lr) # TODO: SGD for now, add options later
 
-    # initialize dataloader
+    # initialize dataset + dataloader
     dataset = datasets.ASLAlphabet(type='train')
+    val_dataset = datasets.ASLAlphabet(type='val')
     train_dataloader = DataLoader(dataset,batch_size=opts.batchsize,shuffle=True,num_workers=opts.num_workers)
-    dataset = datasets.ASLAlphabet(type='val')
-    val_dataloader = DataLoader(dataset,batch_size=opts.val_batchsize,shuffle=True,num_workers=opts.num_workers)
+    val_dataloader = DataLoader(val_dataset,batch_size=opts.val_batchsize,shuffle=True)
 
     # initialize loss function
     if opts.lossfunc in ['crossentropy','crossentropyloss']:
@@ -290,7 +296,7 @@ if __name__ == "__main__":
           device=opts.device,
           log_basedir=opts.log_basedir,
           log_subdir=opts.log_subdir,
-          log_frequency=opts.log_freq,
+          log_frequency=opts.log_frequency,
           val_frequency=opts.val_frequency)
 
     print('[ testing eval mode ... ]')
