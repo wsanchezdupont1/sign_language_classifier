@@ -29,7 +29,7 @@ def train(net,
           batchsize=32,
           numepochs=1,
           device='cuda',
-          log_basedir='/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs',
+          log_basedir='/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs',
           log_subdir='run0',
           log_frequency=100,
           val_frequency=100,
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
     parser.add_argument('--val_batchsize',type=str,default=32,help='(int) Validation dataloader batch size | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
-    parser.add_argument('--log_basedir',type=str,default="/home/wjsd/Desktop/Coding projects/sign_language_classifier/sign_language_classifier/trainlogs/",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
+    parser.add_argument('--log_basedir',type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs/",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
     parser.add_argument('--log_subdir',type=str,default='run0',help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
     parser.add_argument('-lf','--log_frequency',type=int,default=100,help="(int) Logging frequency (number of batches")
     parser.add_argument('-vf','--val_frequency',type=int,default=100,help="(int) Validation batch frequency in number of training batches processed")

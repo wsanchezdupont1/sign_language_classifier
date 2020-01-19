@@ -8,8 +8,8 @@ Make the validation set by moving some images from /train to /val.
 import numpy as np
 import os
 
-def make_validation_set(traindir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/train",
-                        valdir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/asl_alphabet/val",
+def make_validation_set(traindir="/home/wjsd/Desktop/Coding/sign_language_classifier/asl_alphabet/train",
+                        valdir="/home/wjsd/Desktop/Coding/sign_language_classifier/asl_alphabet/val",
                         val_frac=0.15):
     """
     make_validation_set
