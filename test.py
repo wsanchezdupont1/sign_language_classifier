@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import os
 
 parser = ArgumentParser()
-parser.add_argument('--filename',type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs/run2/state_dicts/net_state_dict_epoch7.pth",help="(str) filepath to network state dictionary")
+parser.add_argument('--filename',type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs/run1/state_dicts/net_state_dict_epoch7.pth",help="(str) filepath to network state dictionary")
 parser.add_argument('--batchsize',type=int,default=36,help="Batch size")
 parser.add_argument('--ntestbatches',type=int,default=10,help="Number of test batches to evaluate accuracy on")
 # TODO: cams by batch

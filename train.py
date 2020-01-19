@@ -55,6 +55,7 @@ def train(net,
     """
 
     net.to(device) # move params to device
+    net.train()
     print('[ network pushed to device ]')
 
     logpath = os.path.join(log_basedir,log_subdir)
@@ -119,7 +120,7 @@ def train(net,
             if log_frequency != 0 and batches_processed % log_frequency == 0:
                 print('logstep =',logstep)
                 print('batches_processed =',batches_processed)
-                print('epoch_progress =',batchsize*batches_processed/len(train_dataloader.dataset)
+                print('epoch_progress =',batchsize*batches_processed/len(train_dataloader.dataset))
                 print('train_samples_processed =',batchsize*batches_processed)
 
                 # TODO: make sure this is working fully
