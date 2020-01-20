@@ -126,7 +126,8 @@ def train(net,
                 # TODO: make sure this is working fully
                 # log time for log_frequency batches
                 t_end = time.time()
-                s.add_scalars('times',{'batches_{}'.format(log_frequency):t_end-t_start, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
+                mtpb = (t_end-t_start)/log_frequency # mean time per sample
+                s.add_scalars('mean_time_per_batch':mtpb, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
                 t_start = t_end
 
                 # compute accuracy
@@ -265,7 +266,7 @@ if __name__ == "__main__":
     os.mkdir(logpath)
 
     # save parsed arguments to txt file
-    opts_filename = os.path.join(logpath,'opts_{}.pth'.format(opts.log_subdir))
+    opts_filename = os.path.join(logpath,'opts_{}.txt'.format(opts.log_subdir))
     print('saving parsed arguments to .txt file: {}'.format(opts_filename))
     saveopts(opts_filename,opts)
 
