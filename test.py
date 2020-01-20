@@ -23,7 +23,7 @@ import os
 
 parser = ArgumentParser()
 parser.add_argument('--filename',type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs/run1/state_dicts/net_state_dict_epoch7.pth",help="(str) filepath to network state dictionary")
-parser.add_argument('--batchsize',type=int,default=36,help="Batch size")
+parser.add_argument('--batchsize',type=int,default=1,help="Batch size")
 parser.add_argument('--ntestbatches',type=int,default=10,help="Number of test batches to evaluate accuracy on")
 # TODO: cams by batch
 parser.add_argument('-cbb','--cams_by_batch',action='store_true',help="If flagged, make image grid by batch rather than by letter")
@@ -65,7 +65,13 @@ print('accs = ',accs)
 # test grad-cam
 GC = GradCAM(net,device=opts.device)
 samples.requires_grad = True
-cams = GC(samples,submodule=net.conv6,guided=opts.guided).unsqueeze(2).detach() # add channel dim
+
+guidemods = []
+for mod in net.features:
+    if mod.__class__.__name__ == "ReLU":
+        guidemods.append(mod)
+
+cams = GC(samples,submodule=net.features[-2],guided=guidemods)
 print('cams.shape =',cams.shape)
 
 cams = torch.nn.Upsample(scale_factor=2,mode='bilinear')(cams[0])
