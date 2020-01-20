@@ -53,6 +53,8 @@ def train(net,
         val_frequency - (int) process validation batch every val_frequency samples
 
     """
+    if log_frequency > val_frequency:
+        raise Exception("log_frequency must be less than or equal to val_frequency!")
 
     net.to(device) # move params to device
     net.train()
@@ -178,6 +180,9 @@ def train(net,
 
                         # val losses
                         loss_val = lossfunc(scores,labels)
+
+                        print('loss_val =',loss_val)
+
                         loss_val_mean = loss_val.mean()
                         loss_val_var = loss_val.var()
                         v.add_scalars('losses',{'val_mean':loss_val_mean,'val_var':loss_val_var},logstep)
@@ -250,7 +255,7 @@ if __name__ == "__main__":
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
     parser.add_argument('--lossfunc',type=str,default='crossentropy',help="(str) Loss function type | default: 'crossentropy'")
-    parser.add_argument('-r','--reduction',type=str,default='mean',help="(str) Loss function reduction | default: 'mean'")
+    parser.add_argument('-r','--reduction',type=str,default='none',help="(str) Loss function reduction | default: 'none'")
     # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
 
     # add more args here as features are added...
