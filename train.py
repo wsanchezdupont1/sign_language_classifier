@@ -112,7 +112,10 @@ def train(net,
 
             compute_time = time.time() - compute_start
 
-            batches_processed += 1
+            if train_dataloader.num_workers != 0:
+                batches_processed += train_dataloader.num_workers
+            else:
+                batches_processed += 1
 
             #
             # Tensorboard logging
@@ -248,7 +251,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers',type=int,default=0,help="(int) Number of DataLoader cpu workers | default: 0")
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
-    parser.add_argument('--lossfunc',type=str,default='crossentropy',help="(str) Loss functiion type | default: 'crossentropy'")
+    parser.add_argument('--lossfunc',type=str,default='crossentropy',help="(str) Loss function type | default: 'crossentropy'")
+    parser.add_argument('-r','--reduction',type=str,default='mean',help="(str) Loss function reduction | default: 'mean'")
     # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
 
     # add more args here as features are added...
@@ -281,7 +285,7 @@ if __name__ == "__main__":
 
     # initialize loss function
     if opts.lossfunc in ['crossentropy','crossentropyloss']:
-        lossfunc = torch.nn.CrossEntropyLoss(reduction='none')
+        lossfunc = torch.nn.CrossEntropyLoss(reduction=opts.reduction)
     else:
         raise Exception("Loss function invalid!")
 
