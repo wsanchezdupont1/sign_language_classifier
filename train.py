@@ -112,10 +112,7 @@ def train(net,
 
             compute_time = time.time() - compute_start
 
-            if train_dataloader.num_workers != 0:
-                batches_processed += train_dataloader.num_workers
-            else:
-                batches_processed += 1
+            batches_processed += 1
 
             #
             # Tensorboard logging
