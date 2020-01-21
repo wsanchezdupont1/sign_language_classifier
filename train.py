@@ -99,17 +99,13 @@ def train(net,
             scores = net(samples)
             probs = scores.softmax(dim=1)
 
-            loss = lossfunc(scores,labels) # with batch dim (note: default reduction is 'none' - see below)
+            loss = lossfunc(scores,labels) # reduced to scalar
 
             # TODO: add regularization (e.g. L1/L2)
 
-            # store mean and std
-            loss_var = torch.var(loss)
-            loss_mean = torch.mean(loss)
-
             # backprop + paramater update
             optimizer.zero_grad()
-            loss_mean.backward()
+            loss.backward()
             optimizer.step()
 
             compute_time = time.time() - compute_start
@@ -120,16 +116,12 @@ def train(net,
             # Tensorboard logging
             #
             if log_frequency != 0 and batches_processed % log_frequency == 0:
-                print('logstep =',logstep)
-                print('batches_processed =',batches_processed)
-                print('epoch_progress =',batchsize*batches_processed/len(train_dataloader.dataset))
-                print('train_samples_processed =',batchsize*batches_processed)
 
                 # TODO: make sure this is working fully
                 # log time for log_frequency batches
                 t_end = time.time()
                 mtpb = (t_end-t_start)/log_frequency # mean time per sample
-                s.add_scalars('mean_time_per_batch':mtpb, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
+                s.add_scalars('times',{'mean_time_per_batch':mtpb, 'transfer_time':transfer_time, 'compute_time':compute_time},logstep)
                 t_start = t_end
 
                 # compute accuracy
@@ -137,12 +129,12 @@ def train(net,
                 acc = (class_pred==labels).sum() / float(len(labels))  # accuracy
                 s.add_scalars('accuracies',{'train':acc},logstep)
 
-                # record batch loss mean + std
-                s.add_scalars('losses',{'loss/mean':loss_mean,'loss/var':loss_var},logstep)
+                # record batch loss
+                s.add_scalars('losses',{'loss':loss},logstep)
 
                 # histograms
                 # TODO: add histogram of weights
-                s.add_histogram('losses/batch',loss,logstep) # batch losses
+                # s.add_histogram('losses/batch',loss,logstep) # use only if loss function has reduction='none'
 
                 # TODO: get PR curves working
                 one_hot = torch.nn.functional.one_hot(labels)
@@ -162,6 +154,12 @@ def train(net,
                 # TODO: grad-CAM
 
                 # TODO: activation distributions for layers
+
+                print('logstep =',logstep)
+                print('batches_processed =',batches_processed)
+                print('epoch_progress =',batchsize*batches_processed/len(train_dataloader.dataset))
+                print('train_samples_processed =',batchsize*batches_processed)
+                print('mean_time_per_batch =',mtpb)
                 print('----------------------------------------------------------------')
 
 
@@ -180,12 +178,7 @@ def train(net,
 
                         # val losses
                         loss_val = lossfunc(scores,labels)
-
-                        print('loss_val =',loss_val)
-
-                        loss_val_mean = loss_val.mean()
-                        loss_val_var = loss_val.var()
-                        v.add_scalars('losses',{'val_mean':loss_val_mean,'val_var':loss_val_var},logstep)
+                        v.add_scalars('losses',{'val':loss_val},logstep)
 
                         # val accuracy
                         _,class_pred = probs.max(dim=1)
@@ -255,7 +248,7 @@ if __name__ == "__main__":
     # parser.add_argument('--lossType',type=str,default='crossentropy',help='(str) Loss type | default: crossentropy')
     parser.add_argument('--lr',type=float,default=0.001,help='(float) Learning rate | default: 0.001')
     parser.add_argument('--lossfunc',type=str,default='crossentropy',help="(str) Loss function type | default: 'crossentropy'")
-    parser.add_argument('-r','--reduction',type=str,default='none',help="(str) Loss function reduction | default: 'none'")
+    parser.add_argument('-r','--reduction',type=str,default='sum',help="(str) Loss function reduction | default: 'sum'")
     # parser.add_argument('--optimizertype',type=str,default='SGD',help='(str) Optimizer type | default:SGD')
 
     # add more args here as features are added...
@@ -288,9 +281,11 @@ if __name__ == "__main__":
 
     # initialize loss function
     if opts.lossfunc in ['crossentropy','crossentropyloss']:
-        lossfunc = torch.nn.CrossEntropyLoss(reduction=opts.reduction)
+        lossfunc = torch.nn.CrossEntropyLoss
     else:
         raise Exception("Loss function invalid!")
+
+    lossfunc = lossfunc(reduction=opts.reduction)
 
     train(net,
           optimizer,
