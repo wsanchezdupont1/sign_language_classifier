@@ -37,32 +37,37 @@ class SLClassifier(nn.Module):
         self.features = torch.nn.ModuleList([])
         self.features.append(nn.BatchNorm2d(num_features=3)) # 3-channel inputs
 
-        self.features.append(nn.Conv2d(3,32,3))
-        self.features.append(nn.Conv2d(32,32,3)) # Nx32x198x198
-        self.features.append(nn.ReLU()) # Nx32x198x198
+        self.features.append(nn.Conv2d(3,32,3)) # Nx32x198x198
+        self.features.append(nn.ReLU())
+        self.features.append(nn.Conv2d(32,32,3)) # Nx32x196x196
+        self.features.append(nn.ReLU())
         self.features.append(nn.BatchNorm2d(num_features=32)) # Nx32x196x196
 
         self.features.append(nn.Conv2d(32,64,4,stride=2)) # Nx64x97x97
+        self.features.append(nn.ReLU())
         self.features.append(nn.Conv2d(64,64,4)) # Nx64x94x94
-        self.features.append(nn.ReLU()) # Nx64x94x94
+        self.features.append(nn.ReLU())
         self.features.append(nn.BatchNorm2d(num_features=64)) # Nx64x94x94
 
         self.features.append(nn.Conv2d(64,64,4,stride=2)) # Nx64x46x46
+        self.features.append(nn.ReLU())
         self.features.append(nn.Conv2d(64,64,4)) # Nx64x43x43
-        self.features.append(nn.ReLU()) # Nx64x43x43
+        self.features.append(nn.ReLU())
         self.features.append(nn.BatchNorm2d(num_features=64)) # Nx64x43x43
 
         self.features.append(nn.Conv2d(64,32,3,stride=2)) # Nx32x21x21
+        self.features.append(nn.ReLU())
         self.features.append(nn.Conv2d(32,16,4)) # Nx16x18x18
-        self.features.append(nn.ReLU()) # Nx16x18x18
-        self.features.append(nn.BatchNorm2d(num_features=16)) # Nx16x18x18
+        self.features.append(nn.ReLU())
 
         self.classifier = torch.nn.ModuleList([])
         self.classifier.append(Flatten()) # Nx5184 = Nx16*18*18
         self.classifier.append(nn.Linear(5184,256))
         self.classifier.append(nn.Tanh())
+        self.classifier.append(nn.Dropout(0.5))
         self.classifier.append(nn.Linear(256,128))
         self.classifier.append(nn.Tanh())
+        self.classifier.append(nn.Dropout(0.5))
         self.classifier.append(nn.Linear(128,29))
 
     def forward(self,x):
