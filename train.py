@@ -57,7 +57,7 @@ def train(net,
         raise Exception("log_frequency must be less than or equal to val_frequency!")
 
     net.to(device) # move params to device
-    net.train()
+    net.train() # set training mode
     print('[ network pushed to device ]')
 
     logpath = os.path.join(log_basedir,log_subdir)
@@ -168,6 +168,7 @@ def train(net,
             #
             if val_frequency != 0:
                 if batches_processed % val_frequency == 0 and val_frequency != 0:
+                    net.eval() # set evaluation mode
                     with torch.no_grad():
                         labels,samples = next(val_dataloader_it)
                         labels = labels.to(device)
@@ -190,6 +191,8 @@ def train(net,
                     # reset validation dataloader if we just completed the last batch
                     if torch.Tensor([val_batches_processed]) % torch.ceil(torch.Tensor([len(val_dataloader.dataset) / val_dataloader.batch_size])) == 0:
                         val_dataloader_it = iter(val_dataloader)
+
+                    net.train()
 
             logstep += 1
 
@@ -238,7 +241,7 @@ if __name__ == "__main__":
     # misc but important arguments
     parser.add_argument('-n','--numepochs',type=int,default=1,help='(int) Number of epochs to train on | default: 1 (for testing only)')
     parser.add_argument('-b','--batchsize',type=int,default=32,help='(int) Number of samples per batch | default: 32')
-    parser.add_argument('--val_batchsize',type=str,default=32,help='(int) Validation dataloader batch size | default: 32')
+    parser.add_argument('--val_batchsize',type=int,default=32,help='(int) Validation dataloader batch size | default: 32')
     parser.add_argument('-d','--device',type=str,default='cuda',help='(str) Device to process on | default: cuda')
     parser.add_argument('--log_basedir',type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/sign_language_classifier/trainlogs/",help="(str) Project logging folder that holds all logs (e.g. 'C:\\Users...\\project_name\logs')")
     parser.add_argument('--log_subdir',type=str,default='run0',help="(str) Subdirectory of log_basedir specifying the storage folder for this particular experiment (e.g. 'run1')")
