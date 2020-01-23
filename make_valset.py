@@ -52,8 +52,8 @@ def make_validation_set(traindir="/home/wjsd/Desktop/Coding/sign_language_classi
 
     return valdir
 
-def make_empty_letterdirs(traindir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/train",
-                          valdir="/home/wjsd/Desktop/Coding projects/sign_language_classifier/val"):
+def make_empty_letterdirs(traindir="/home/wjsd/Desktop/Coding/sign_language_classifier/train",
+                          valdir="/home/wjsd/Desktop/Coding/sign_language_classifier/val"):
     """
     make_empty_letterdirs
 
@@ -68,4 +68,59 @@ def make_empty_letterdirs(traindir="/home/wjsd/Desktop/Coding projects/sign_lang
     for letter in letters:
         os.mkdir(os.path.join(valdir,letter))
 
-make_validation_set() # create val set
+def merge_trainset_valset(traindir="/home/wjsd/Desktop/Coding/sign_language_classifier/train",
+                          valdir="/home/wjsd/Desktop/Coding/sign_language_classifier/val"):
+    """
+    merge_trainset_valset
+
+    A function to put validation samples back into the training directories.
+
+    inputs:
+        traindir - training data directory
+        valdir - validation data directory
+    """
+    # make sure directories exist
+    if not os.path.exist(traindir):
+        raise Exception("traindir does not exist!")
+    elif not os.path.exist(valdir):
+        raise Exception("valdir does not exist!")
+
+    # define and sort letter directories
+    trainletters = os.listdir(traindir)
+    trainletters.sort()
+    valletters = os.listdir(valdir)
+    valletters.sort()
+
+    # make sure they have the same letters
+    for i in range(len(trainletters)):
+        if trainletters[i] != valletters[i]:
+            raise Exception("Letter directory difference between traindir and valdir!")
+
+    # move the samples
+    for letter in valletters:
+        sampleNames = os.listdir(os.path.join(valdir,letter))
+        for name in sampleNames:
+            src = os.path.join(valdir,letter,name)
+            dest = os.path.join(traindir,letter,name)
+            os.rename(src,dest)
+
+    for letter in os.listdir(traindir):
+        if len(os.listdir(os.path.join(traindir,letter))) != 3000:
+            raise Exception("Directory length wrong!")
+
+
+# Run as script
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("--traindir",type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/train",help="Directory containing training data folders")
+    parser.add_argument("--valdir",type=str,default="/home/wjsd/Desktop/Coding/sign_language_classifier/val",help="Directory containing validation data folders")
+    parser.add_argument("--undo",action="store_true",help="Undo validation split by moving all validation samples back into the train directory")
+    opts = parser.parse_args()
+
+    if not opts.undo:
+        make_validation_set(traindir=opts.traindir, valdir=opts.valdir) # create val set
+    else:
+        raise Exception("Please implement merge_trainset_valset")
+        merge_trainset_valset(traindir=opts.traindir, valdir=opts.valdir)
