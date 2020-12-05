@@ -151,12 +151,15 @@ class GradCAM():
             if guided:
                 print('self.guidedGrads.shape =',self.guidedGrads.shape)
 
+        # determine shape of new tensor
         if guided:
             resizedGradCAMs = np.zeros((self.gradCAMs.shape[0],self.gradCAMs.shape[1],3,x.shape[-2],x.shape[-1]))
         else:
             resizedGradCAMs = np.zeros((self.gradCAMs.shape[0],self.gradCAMs.shape[1],x.shape[-2],x.shape[-1]))
-        for i in range(self.gradCAMs.shape[0]):
-            for j in range(self.gradCAMs.shape[1]):
+
+        # fill out resizedGradCAMs
+        for i in range(self.gradCAMs.shape[0]): # batch
+            for j in range(self.gradCAMs.shape[1]): # class
                 resizedcam = cv2.resize(self.gradCAMs[i][j],(x.shape[-2],x.shape[-1]))
                 if guided:
                     resizedGradCAMs[i][j] = resizedcam.reshape(1,*resizedcam.shape) * self.guidedGrads[i][j]
@@ -366,7 +369,7 @@ if __name__ == '__main__':
     '''
     from matplotlib import pyplot as plt
     import numpy as np
-    from torch.autograd import Variable,Function
+    from torch.autograd import Variable
 
     # TODO: add argparse
     from argparse import ArgumentParser
@@ -429,14 +432,23 @@ if __name__ == '__main__':
     # Note: only first image from batch is used because this test script processes a batch of the same sample
     for i in range(len(classes)):
         mask = cam[0][i]
-        if not g:
-            mask = (mask - np.min(mask)) / np.max(mask)
         if g:
             mask = mask.transpose(1,2,0)
+            mask = mask - mask.mean()
+            mask = mask / mask.std()
+            mask = mask*0.1 + 0.5
+            mask = mask.clip(0,1)
+
             ggrads = GC.guidedGrads[0][i].transpose(1,2,0)
-            ggrads = ggrads - ggrads.min()
-            ggrads = ggrads / ggrads.max()
+            ggrads = ggrads - ggrads.mean()
+            ggrads = ggrads / (ggrads.std() + 1e-5)
+            ggrads = ggrads*0.1
+            ggrads = ggrads + 0.5
+            # ggrads = np.clip(ggrads,0,1)
+            ggrads = ggrads.clip(0,1)
+
             cv2.imwrite(filename='examples/guided_backprop_class_{}.jpg'.format(classes[i]),img=np.uint8(ggrads*255))
             cv2.imwrite(filename='examples/guided_gradcam_class_{}.jpg'.format(classes[i]),img=np.uint8(mask*255))
         else:
+            mask = (mask - np.min(mask)) / np.max(mask)
             create_masked_image(x,mask,filename='examples/cam_class_{}.jpg'.format(classes[i]))
